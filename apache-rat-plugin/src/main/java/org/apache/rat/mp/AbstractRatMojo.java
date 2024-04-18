@@ -26,7 +26,6 @@ import static org.apache.rat.mp.util.ExclusionHelper.addPlexusAndScmDefaults;
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -34,14 +33,17 @@ import java.io.Reader;
 import java.lang.reflect.UndeclaredThrowableException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
+import java.util.Objects;
+import java.util.SortedSet;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.maven.plugin.AbstractMojo;
@@ -52,13 +54,19 @@ import org.apache.maven.project.MavenProject;
 import org.apache.rat.ConfigurationException;
 import org.apache.rat.Defaults;
 import org.apache.rat.ReportConfiguration;
+import org.apache.rat.analysis.license.DeprecatedConfig;
 import org.apache.rat.config.SourceCodeManagementSystems;
 import org.apache.rat.configuration.Format;
 import org.apache.rat.configuration.LicenseReader;
 import org.apache.rat.configuration.MatcherReader;
-import org.apache.rat.configuration.MatcherBuilderTracker;
 import org.apache.rat.license.ILicense;
+import org.apache.rat.license.ILicenseFamily;
+import org.apache.rat.license.LicenseSetFactory.LicenseFilter;
+import org.apache.rat.license.SimpleLicenseFamily;
 import org.apache.rat.mp.util.ScmIgnoreParser;
+import org.apache.rat.mp.util.ignore.GlobIgnoreMatcher;
+import org.apache.rat.mp.util.ignore.IgnoreMatcher;
+import org.apache.rat.mp.util.ignore.IgnoringDirectoryScanner;
 import org.apache.rat.report.IReportable;
 import org.codehaus.plexus.util.DirectoryScanner;
 
@@ -102,9 +110,26 @@ public abstract class AbstractRatMojo extends AbstractMojo {
 
     @Parameter(property = "rat.approvedFile")
     private String approvedLicenseFile;
-
+    
+    /**
+     * Specifies the license families to accept.
+     *
+     * @since 0.8
+     * @deprecated
+     */
+    @Deprecated // remove in v1.0
     @Parameter
-    private License[] licenses;
+    private SimpleLicenseFamily[] licenseFamilies;
+    
+    /**
+     * This is an object to accept both License of DeprecatedConfig objects.
+     */
+    @Deprecated // convert this to an org.apache.rat.mp.License object in v1.0
+    @Parameter
+    private Object[] licenses;
+    
+    @Parameter
+    private Family[] families;
 
     /**
      * Specifies files, which are included in the report. By default, all files are
@@ -235,21 +260,90 @@ public abstract class AbstractRatMojo extends AbstractMojo {
     protected Defaults.Builder getDefaultsBuilder() {
         Defaults.Builder result = Defaults.builder();
         if (defaultLicenseFiles != null) {
-            for (int i = 0; i < defaultLicenseFiles.length; i++) {
+            for (String defaultLicenseFile : defaultLicenseFiles) {
                 try {
-                    result.add(defaultLicenseFiles[i]);
+                    result.add(defaultLicenseFile);
                 } catch (MalformedURLException e) {
-                    throw new ConfigurationException(defaultLicenseFiles[i] + " is not a valid license file", e);
+                    throw new ConfigurationException(defaultLicenseFile + " is not a valid license file", e);
                 }
             }
         }
         return result;
     }
+    
+    @Deprecated // remove this for version 1.0
+    private Stream<License> getLicenses() {
+        if (licenses == null) {
+            return Stream.empty();
+        }
+        return Arrays.stream(licenses).filter( s -> {return s instanceof License;}).map(License.class::cast);
+    }
 
+    @Deprecated // remove this for version 1.0
+    private Stream<DeprecatedConfig> getDeprecatedConfigs() {
+        if (licenses == null) {
+            return Stream.empty();
+        }
+        return Arrays.stream(licenses).filter( s -> {return s instanceof DeprecatedConfig;}).map(DeprecatedConfig.class::cast);
+    }
+    
+    @Deprecated // remove this for version 1.0
+    private void reportDeprecatedProcessing()
+    {
+        if (getDeprecatedConfigs().findAny().isPresent()) {
+            Log log = getLog();
+            log.warn("Configuration uses deprecated configuration.  Please upgrade to v0.17 configuration options");
+        }
+    }
+    
+    @Deprecated // remove this for version 1.0
+    private void processLicenseFamilies(ReportConfiguration config) {
+        List<ILicenseFamily> families = getDeprecatedConfigs().map(DeprecatedConfig::getLicenseFamily).filter(Objects::nonNull).collect(Collectors.toList());
+        if (licenseFamilies != null) {
+            for (SimpleLicenseFamily slf : licenseFamilies) {
+                if (StringUtils.isBlank(slf.getFamilyCategory())) {
+                    families.stream().filter( f -> f.getFamilyName().equalsIgnoreCase(slf.getFamilyName())).findFirst()
+                    .ifPresent(config::addApprovedLicenseCategory);
+                } else {
+                    config.addApprovedLicenseCategory(ILicenseFamily.builder().setLicenseFamilyCategory(slf.getFamilyCategory())
+                    .setLicenseFamilyName(StringUtils.defaultIfBlank(slf.getFamilyName(), slf.getFamilyCategory()))
+                    .build());
+                }
+            }
+        }
+    }
+    
+    private org.apache.rat.utils.Log makeLog() {
+        return new org.apache.rat.utils.Log() {
+            Log log = getLog();
+            @Override
+            public void log(Level level, String msg) {
+                switch (level)
+                {
+                case DEBUG:
+                    log.debug(msg);
+                    break;
+                case INFO:
+                    log.info(msg);;
+                    break;
+                case WARN:
+                    log.warn(msg);
+                    break;
+                case ERROR:
+                    log.error(msg);
+                    break;
+            }
+            }};
+    }
+    
     protected ReportConfiguration getConfiguration() throws MojoExecutionException {
-        @SuppressWarnings("resource")
-        ReportConfiguration result = new ReportConfiguration();
-        
+        ReportConfiguration config = new ReportConfiguration(makeLog());
+        reportDeprecatedProcessing();
+        if (addDefaultLicenses) {
+            config.setFrom(getDefaultsBuilder().build());
+        } else {
+            config.setStyleSheet(Defaults.getPlainStyleSheet());
+        }
         if (additionalLicenseFiles != null) {
             for (String licenseFile : additionalLicenseFiles) {
                 try {
@@ -262,14 +356,36 @@ public abstract class AbstractRatMojo extends AbstractMojo {
                     LicenseReader lReader = fmt.licenseReader();
                     if (lReader != null) {
                             lReader.addLicenses(url);
-                    result.addLicenses(lReader.readLicenses());
-                    result.addApprovedLicenseCategories(lReader.approvedLicenseId());
+                    config.addLicenses(lReader.readLicenses());
+                    config.addApprovedLicenseCategories(lReader.approvedLicenseId());
                     }
                 } catch (MalformedURLException e) {
                     throw new ConfigurationException(licenseFile + " is not a valid license file", e);
                 }
             }
         }
+        if (families != null || getDeprecatedConfigs().findAny().isPresent()) {
+            Log log = getLog();
+            if (log.isDebugEnabled()) {
+                log.debug(String.format("%s license families loaded from pom", families.length));
+            }
+            Consumer<ILicenseFamily> logger = log.isDebugEnabled() ? (l) -> log.debug(String.format("Family: %s", l))
+                    : (l) -> {
+                    };
+
+            Consumer<ILicenseFamily> process = logger.andThen(config::addFamily);
+            getDeprecatedConfigs().map(DeprecatedConfig::getLicenseFamily).filter(Objects::nonNull).forEach(process);
+            if (families != null)  { // TODO remove if check in v1.0
+                Arrays.stream(families).map(Family::build).forEach(process);
+            }
+        }
+
+        processLicenseFamilies(config);
+        
+        if (approvedLicenses != null && approvedLicenses.length > 0) {
+            Arrays.stream(approvedLicenses).forEach(config::addApprovedLicenseCategory);
+        }
+
         if (licenses != null) {
             Log log = getLog();
             if (log.isDebugEnabled()) {
@@ -279,19 +395,19 @@ public abstract class AbstractRatMojo extends AbstractMojo {
                     : (l) -> {
                     };
             Consumer<ILicense> addApproved = (approvedLicenses == null || approvedLicenses.length == 0)
-                    ? (l) -> result.addApprovedLicenseCategory(l.getLicenseFamily())
+                    ? (l) -> config.addApprovedLicenseCategory(l.getLicenseFamily())
                     : (l) -> {
                     };
 
-            Consumer<ILicense> process = logger.andThen(result::addLicense).andThen(addApproved);
-            Arrays.stream(licenses).map(License::build).forEach(process);
+            Consumer<ILicense> process = logger.andThen(config::addLicense).andThen(addApproved);
+            SortedSet<ILicenseFamily> families = config.getLicenseFamilies(LicenseFilter.all);
+            getDeprecatedConfigs().map(DeprecatedConfig::getLicense).filter(Objects::nonNull)
+            .map(x -> x.build(families)).forEach(process);
+            getLicenses().map(x -> x.build(families)).forEach(process);
         }
 
-        if (approvedLicenses != null && approvedLicenses.length > 0) {
-            Arrays.stream(approvedLicenses).forEach(result::addApprovedLicenseCategory);
-        }
-        result.setReportable(getReportable());
-        return result;
+        config.setReportable(getReportable());
+        return config;
     }
 
     protected void logLicenses(Collection<ILicense> licenses) {
@@ -311,7 +427,7 @@ public abstract class AbstractRatMojo extends AbstractMojo {
      * UndeclaredThrowableExceptions.
      */
     private IReportable getReportable() throws MojoExecutionException {
-        final DirectoryScanner ds = new DirectoryScanner();
+        final IgnoringDirectoryScanner ds = new IgnoringDirectoryScanner();
         ds.setBasedir(basedir);
         setExcludes(ds);
         setIncludes(ds);
@@ -381,7 +497,7 @@ public abstract class AbstractRatMojo extends AbstractMojo {
         Throwable th = null;
         final List<String> patterns = new ArrayList<>();
         try {
-            is = new FileInputStream(pFile);
+            is = Files.newInputStream(pFile.toPath());
             bis = new BufferedInputStream(is);
             r = new InputStreamReader(bis, pCharset);
             br = new BufferedReader(r);
@@ -452,8 +568,8 @@ public abstract class AbstractRatMojo extends AbstractMojo {
         return patterns;
     }
 
-    private void setExcludes(DirectoryScanner ds) throws MojoExecutionException {
-        final List<String> excludeList = mergeDefaultExclusions();
+    private void setExcludes(IgnoringDirectoryScanner ds) throws MojoExecutionException {
+        final List<IgnoreMatcher> ignoreMatchers = mergeDefaultExclusions();
         if (excludes == null || excludes.length == 0) {
             getLog().debug("No excludes explicitly specified.");
         } else {
@@ -462,47 +578,77 @@ public abstract class AbstractRatMojo extends AbstractMojo {
                 getLog().debug("Exclude: " + exclude);
             }
         }
-        if (excludes != null) {
-            Collections.addAll(excludeList, excludes);
+
+        final List<String> globExcludes = new ArrayList<>();
+        for (IgnoreMatcher ignoreMatcher : ignoreMatchers) {
+            if (ignoreMatcher instanceof GlobIgnoreMatcher) {
+                // The glob matching we do via the DirectoryScanner
+                globExcludes.addAll(((GlobIgnoreMatcher) ignoreMatcher).getExclusionLines());
+            } else {
+                // All others (git) are used directly
+                ds.addIgnoreMatcher(ignoreMatcher);
+            }
         }
-        if (!excludeList.isEmpty()) {
-            final String[] allExcludes = excludeList.toArray(new String[excludeList.size()]);
+
+        if (excludes != null) {
+            Collections.addAll(globExcludes, excludes);
+        }
+        if (!globExcludes.isEmpty()) {
+            final String[] allExcludes = globExcludes.toArray(new String[globExcludes.size()]);
             ds.setExcludes(allExcludes);
         }
     }
 
-    private List<String> mergeDefaultExclusions() throws MojoExecutionException {
-        final Set<String> results = new HashSet<>();
+    private List<IgnoreMatcher> mergeDefaultExclusions() throws MojoExecutionException {
+        List<IgnoreMatcher> ignoreMatchers = new ArrayList<>();
 
-        addPlexusAndScmDefaults(getLog(), useDefaultExcludes, results);
-        addMavenDefaults(getLog(), useMavenDefaultExcludes, results);
-        addEclipseDefaults(getLog(), useEclipseDefaultExcludes, results);
-        addIdeaDefaults(getLog(), useIdeaDefaultExcludes, results);
+        final GlobIgnoreMatcher basicRules = new GlobIgnoreMatcher();
+
+        basicRules.addRules(addPlexusAndScmDefaults(getLog(), useDefaultExcludes));
+        basicRules.addRules(addMavenDefaults(getLog(), useMavenDefaultExcludes));
+        basicRules.addRules(addEclipseDefaults(getLog(), useEclipseDefaultExcludes));
+        basicRules.addRules(addIdeaDefaults(getLog(), useIdeaDefaultExcludes));
 
         if (parseSCMIgnoresAsExcludes) {
             getLog().debug("Will parse SCM ignores for exclusions...");
-            results.addAll(ScmIgnoreParser.getExclusionsFromSCM(getLog(), project.getBasedir()));
+            ignoreMatchers.addAll(ScmIgnoreParser.getExclusionsFromSCM(getLog(), project.getBasedir()));
             getLog().debug("Finished adding exclusions from SCM ignore files.");
         }
 
         if (excludeSubProjects && project != null && project.getModules() != null) {
-            for (final Object o : project.getModules()) {
-                final String moduleSubPath = (String) o;
+            for (final String moduleSubPath : project.getModules()) {
                 if (new File(basedir, moduleSubPath).isDirectory()) {
-                    results.add(moduleSubPath + "/**/*");
+                    basicRules.addRule(moduleSubPath + "/**/*");
                 } else {
-                    results.add(StringUtils.substringBeforeLast(moduleSubPath, "/") + "/**/*");
+                    basicRules.addRule(StringUtils.substringBeforeLast(moduleSubPath, "/") + "/**/*");
                 }
             }
         }
 
-        getLog().debug("Finished creating list of implicit excludes.");
-        if (results.isEmpty()) {
-            getLog().debug("No excludes implicitly specified.");
-        } else {
-            getLog().debug(results.size() + " implicit excludes.");
-            for (final String exclude : results) {
-                getLog().debug("Implicit exclude: " + exclude);
+        if (getLog().isDebugEnabled()) {
+            getLog().debug("Finished creating list of implicit excludes.");
+            if (basicRules.getExclusionLines().isEmpty() && ignoreMatchers.isEmpty()) {
+                getLog().debug("No excludes implicitly specified.");
+            } else {
+                if (!basicRules.getExclusionLines().isEmpty()) {
+                    getLog().debug(basicRules.getExclusionLines().size() + " implicit excludes.");
+                    for (final String exclude : basicRules.getExclusionLines()) {
+                        getLog().debug("Implicit exclude: " + exclude);
+                    }
+                }
+                for (IgnoreMatcher ignoreMatcher : ignoreMatchers) {
+                    if (ignoreMatcher instanceof GlobIgnoreMatcher) {
+                        GlobIgnoreMatcher globIgnoreMatcher = (GlobIgnoreMatcher) ignoreMatcher;
+                        if (!globIgnoreMatcher.getExclusionLines().isEmpty()) {
+                            getLog().debug(globIgnoreMatcher.getExclusionLines().size() + " implicit excludes from SCM.");
+                            for (final String exclude : globIgnoreMatcher.getExclusionLines()) {
+                                getLog().debug("Implicit exclude: " + exclude);
+                            }
+                        }
+                    } else {
+                        getLog().debug("Implicit exclude: \n" + ignoreMatcher);
+                    }
+                }
             }
         }
         if (excludesFile != null) {
@@ -515,9 +661,13 @@ public abstract class AbstractRatMojo extends AbstractMojo {
             }
             final String charset = excludesFileCharset == null ? "UTF8" : excludesFileCharset;
             getLog().debug("Loading excludes from file " + f + ", using character set " + charset);
-            results.addAll(getPatternsFromFile(f, charset));
+            basicRules.addRules(getPatternsFromFile(f, charset));
         }
 
-        return new ArrayList<>(results);
+        if (!basicRules.isEmpty()) {
+            ignoreMatchers.add(basicRules);
+        }
+
+        return ignoreMatchers;
     }
 }

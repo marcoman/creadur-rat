@@ -18,17 +18,16 @@
  */
 package org.apache.rat.analysis.license;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.StringReader;
-import java.util.ArrayList;
-import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.rat.Defaults;
@@ -37,9 +36,13 @@ import org.apache.rat.analysis.matchers.FullTextMatcher;
 import org.apache.rat.api.MetaData;
 import org.apache.rat.license.ILicense;
 import org.apache.rat.license.ILicenseFamily;
+import org.apache.rat.license.LicenseSetFactory;
 import org.apache.rat.license.LicenseSetFactory.LicenseFilter;
-import org.junit.Before;
-import org.junit.Test;
+import org.apache.rat.testhelpers.TestingLicense;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+
 
 /**
  * Test to see if short form license information will be recognized correctly.
@@ -48,75 +51,65 @@ import org.junit.Test;
 abstract public class AbstractLicenseTest {
     private static int NAME = 0;
     private static int TEXT = 1;
-    
+
     private Defaults defaults;
     protected MetaData data;
 
-    private final String category;
-    private final String name;
-    private final String notes;
-    private final String[][] targets;
+    
+    protected AbstractLicenseTest() {
+    }
     
 
-    protected AbstractLicenseTest(String cat, String name, String notes, String[][] targets) {
-        this.category = ILicenseFamily.makeCategory(cat);
-        this.name = name;
-        this.notes = notes;
-        this.targets = targets;
-    }
-
-    @Before
+    @BeforeEach
     public void setup() {
         data = new MetaData();
         defaults = Defaults.builder().build();
     }
 
-    protected ILicense extractCategory(String category) {
-        ILicenseFamily testingFamily = ILicenseFamily.builder()
-                .setLicenseFamilyCategory(category)
-                .setLicenseFamilyName("Testing category").build();
-        List<ILicense> matchers = new ArrayList<>();
-        defaults.getLicenses(LicenseFilter.all).stream().filter(x -> x.getLicenseFamily().compareTo(testingFamily) == 0)
-                .forEach(matchers::add);
-        if (matchers.isEmpty()) {
-            fail("No machers for category: " + category);
+    protected ILicense extractCategory(String id) {
+        TestingLicense testingLicense = new TestingLicense();
+        testingLicense.setId(id);
+        ILicense result = LicenseSetFactory.search(testingLicense, defaults.getLicenses(LicenseFilter.all));
+        if (result == null) {
+            fail("No licenses for id: " + id);
         }
-        if (matchers.size() > 1) {
-            fail("Too many matchers for category: " + category);
-        }
-        return matchers.get(0);
+        return result;
     }
 
-    @Test
-    public void testMatchProcessing() throws IOException {
-        ILicense license = extractCategory(category);
-        try {
-            for (String[] target : targets) {
-                if (processText(license, target[TEXT])) {
-                    data.reportOnLicense(license);
-                    assertNotNull("No URL HEADER CATEGORY", data.get(MetaData.RAT_URL_HEADER_CATEGORY));
-                    assertEquals(license.toString(), category, data.get(MetaData.RAT_URL_HEADER_CATEGORY).getValue());
-                    assertNotNull("No URL LICENSE FAMILY CATEGORY", data.get(MetaData.RAT_URL_LICENSE_FAMILY_CATEGORY));
-                    assertEquals(license.toString(), category,
-                            data.get(MetaData.RAT_URL_LICENSE_FAMILY_CATEGORY).getValue());
-                    if (StringUtils.isNotBlank(notes)) {
-                        assertNotNull("No URL HEADER SAMPLE", data.get(MetaData.RAT_URL_HEADER_SAMPLE));
-                        assertEquals(license.toString(), FullTextMatcher.prune(notes),
-                                FullTextMatcher.prune(data.get(MetaData.RAT_URL_HEADER_SAMPLE).getValue()));
+    @ParameterizedTest
+    @MethodSource("parameterProvider")
+    public void testMatchProcessing(String id, String familyPattern, String name, String notes, String[][] targets) throws IOException {
+        ILicense license = extractCategory(id);
+        String family = ILicenseFamily.makeCategory(familyPattern);
+            try {
+                for (String[] target : targets) {
+                    if (processText(license, target[TEXT])) {
+                        data.reportOnLicense(license);
+                        assertNotNull(data.get(MetaData.RAT_URL_HEADER_CATEGORY),"No URL HEADER CATEGORY");
+                        assertEquals(family,
+                                data.get(MetaData.RAT_URL_HEADER_CATEGORY).getValue(), license.toString());
+                        assertNotNull(data.get(MetaData.RAT_URL_LICENSE_FAMILY_CATEGORY), "No URL LICENSE FAMILY CATEGORY");
+                        assertEquals(family,
+                                data.get(MetaData.RAT_URL_LICENSE_FAMILY_CATEGORY).getValue(), license.toString());
+                        if (StringUtils.isNotBlank(notes)) {
+                            assertNotNull(data.get(MetaData.RAT_URL_HEADER_SAMPLE), "No URL HEADER SAMPLE");
+                            assertEquals(FullTextMatcher.prune(notes),
+                                    FullTextMatcher.prune(data.get(MetaData.RAT_URL_HEADER_SAMPLE).getValue()), license.toString());
+                        } else {
+                            assertNull(data.get(MetaData.RAT_URL_HEADER_SAMPLE), "URL HEADER SAMPLE was not null");
+                        }
+                        assertNotNull(data.get(MetaData.RAT_URL_LICENSE_FAMILY_NAME), "No URL LICENSE FAMILY NAME");
+                        assertEquals(name,
+                                data.get(MetaData.RAT_URL_LICENSE_FAMILY_NAME).getValue(), license.toString());
+                        data.clear();
                     } else {
-                        assertNull("URL HEADER SAMPLE was not null", data.get(MetaData.RAT_URL_HEADER_SAMPLE));
+                        fail(license + " was not matched by " + target[NAME]);
                     }
-                    assertNotNull("No URL LICENSE FAMILY NAME", data.get(MetaData.RAT_URL_LICENSE_FAMILY_NAME));
-                    assertEquals(license.toString(), name, data.get(MetaData.RAT_URL_LICENSE_FAMILY_NAME).getValue());
-                    data.clear();
-                } else {
-                    fail(license + " was not matched by " + target[NAME]);
+                    license.reset();
                 }
+            } finally {
                 license.reset();
             }
-        } finally {
-            license.reset();
-        }
 
     }
 
@@ -132,23 +125,24 @@ abstract public class AbstractLicenseTest {
         }
     }
 
-    @Test
-    public void testEmbeddedStrings() throws IOException {
+    @ParameterizedTest
+    @MethodSource("parameterProvider")
+    public void testEmbeddedStrings(String id, String family, String name, String notes, String[][] targets) throws IOException {
         String formats[] = { "%s", "now is not the time %s for copyright", "#%s", "##%s", "## %s", "##%s##", "## %s ##",
                 "/*%s*/", "/* %s */" };
 
-        ILicense license = extractCategory(category);
-        try {
-            for (String[] target : targets) {
-                for (String fmt : formats) {
-                    boolean found = processText(license, String.format(fmt, target[TEXT]));
-                    license.reset();
-                    assertTrue(String.format("%s %s did not match pattern '%s' for target string %s", category, name,
-                            fmt, target[NAME]), found);
+        ILicense license = extractCategory(id);
+            try {
+                for (String[] target : targets) {
+                    for (String fmt : formats) {
+                        boolean found = processText(license, String.format(fmt, target[TEXT]));
+                        license.reset();
+                        assertTrue(found, ()->String.format("%s %s did not match pattern '%s' for target string %s", id,
+                                name, fmt, target[NAME]));
+                    }
                 }
+            } finally {
+                license.reset();
             }
-        } finally {
-            license.reset();
-        }
     }
 }

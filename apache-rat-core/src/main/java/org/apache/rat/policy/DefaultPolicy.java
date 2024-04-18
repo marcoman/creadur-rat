@@ -26,26 +26,26 @@ import org.apache.rat.api.Document;
 import org.apache.rat.api.MetaData;
 import org.apache.rat.document.IDocumentAnalyser;
 import org.apache.rat.license.ILicenseFamily;
-import org.apache.rat.license.LicenseSetFactory;
+import org.apache.rat.license.LicenseFamilySetFactory;
 
 /**
  * A default Document Analyser that determines if the matched license is in the set of approved licenses.
  */
 public class DefaultPolicy implements IDocumentAnalyser {
-    private SortedSet<ILicenseFamily> approvedLicenseFamilies;
+    private final SortedSet<ILicenseFamily> approvedLicenseFamilies;
 
     /**
      * Constructor with the list of approved license families.
      * @param approvedLicenseFamilies the approved license families.
      */
     public DefaultPolicy(final Collection<ILicenseFamily> approvedLicenseFamilies) {
-        this.approvedLicenseFamilies = LicenseSetFactory.emptyLicenseFamilySet();
+        this.approvedLicenseFamilies = LicenseFamilySetFactory.emptyLicenseFamilySet();
         this.approvedLicenseFamilies.addAll(approvedLicenseFamilies);
     }
 
     /**
      * adds an ILicenseFamily to the list of approved licenses.
-     * @param approvedLicense
+     * @param approvedLicense license to be approved.
      */
     public void add(ILicenseFamily approvedLicense) {
         this.approvedLicenseFamilies.add(approvedLicense);
@@ -54,7 +54,7 @@ public class DefaultPolicy implements IDocumentAnalyser {
     @Override
     public void analyse(final Document document) {
         if (document != null) {
-            boolean approval = false;
+            boolean approval;
             if (document.getMetaData().value(MetaData.RAT_URL_HEADER_CATEGORY) != null) {
                 ILicenseFamily licenseFamily = ILicenseFamily.builder()
                         .setLicenseFamilyCategory(
@@ -78,8 +78,8 @@ public class DefaultPolicy implements IDocumentAnalyser {
     }
 
     /**
-     * Gets and unmodifiable reference to the SortedSet of approved licenses that this policy is holding.
-     * @return
+     * Gets an unmodifiable reference to the SortedSet of approved licenses that this policy is holding.
+     * @return sorted set of license family definitions.
      */
     public SortedSet<ILicenseFamily> getApprovedLicenseNames() {
         return Collections.unmodifiableSortedSet(approvedLicenseFamilies);

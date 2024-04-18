@@ -40,7 +40,7 @@ public interface ILicenseFamily extends Comparable<ILicenseFamily> {
     }
 
     /**
-     * Convert a potential category string into a category string of exactly 5 characters either buy truncating
+     * Convert a potential category string into a category string of exactly 5 characters either by truncating
      * the string or appending spaces as necessary.
      * @param cat the string to convert.
      * @return a string of exactly 5 characters.
@@ -72,6 +72,12 @@ public interface ILicenseFamily extends Comparable<ILicenseFamily> {
          * @return this builder for chaining.
          */
         Builder setLicenseFamilyName(String licenseFamilyName);
+        
+        /**
+         * Gets the category that this builder is building.
+         * @return the category that this builder is building.
+         */
+        String getCategory();
 
         /**
          * @return a new ILicenseFamily instance.

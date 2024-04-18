@@ -49,19 +49,19 @@ public class XmlReportFactory {
      * @param configuration The report configuration.
      * @return a RatReport instance.
      */
-    public static final RatReport createStandardReport(IXmlWriter writer,
-            final ClaimStatistic statistic, ReportConfiguration configuration) {
+    public static RatReport createStandardReport(IXmlWriter writer,
+                                                 final ClaimStatistic statistic, ReportConfiguration configuration) {
         final List<RatReport> reporters = new ArrayList<>();
         if (statistic != null) {
             reporters.add(new ClaimAggregator(statistic));
         }
         if (configuration.isAddingLicenses()) {
-            reporters.add(new LicenseAddingReport(configuration.getCopyrightMessage(), configuration.isAddingLicensesForced()));
+            reporters.add(new LicenseAddingReport(configuration.getLog(), configuration.getCopyrightMessage(), configuration.isAddingLicensesForced()));
         }
         reporters.add(new SimpleXmlClaimReporter(writer));
 
         final IDocumentAnalyser analyser =
-            DefaultAnalyserFactory.createDefaultAnalyser(configuration.getLicenses(LicenseFilter.all));
+            DefaultAnalyserFactory.createDefaultAnalyser(configuration.getLog(), configuration.getLicenses(LicenseFilter.all));
         final DefaultPolicy policy = new DefaultPolicy(configuration.getLicenseFamilies(LicenseFilter.approved));
 
         final IDocumentAnalyser[] analysers = {analyser, policy};

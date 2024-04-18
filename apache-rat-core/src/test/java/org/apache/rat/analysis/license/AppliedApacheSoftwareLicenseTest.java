@@ -18,9 +18,13 @@
  */
 package org.apache.rat.analysis.license;
 
+import java.util.stream.Stream;
+
+import org.junit.jupiter.params.provider.Arguments;
+
 public class AppliedApacheSoftwareLicenseTest extends AbstractLicenseTest {
 
-    private static String CATEGORY = "ASL";
+    private static String ID = "ASL";
     private static String NAME = "Applied Apache License Version 2.0";
     private static String[][] targets = { { "simple", "/*\n" + " *  Copyright 2012-2013 FooBar.\n" + " *\n"
             + " *  Licensed under the Apache License, Version 2.0 (the \"License\");\n"
@@ -32,9 +36,10 @@ public class AppliedApacheSoftwareLicenseTest extends AbstractLicenseTest {
             + " *  See the License for the specific language governing permissions and\n"
             + " *  limitations under the License.\n" + " */\n" } };
 
-    public AppliedApacheSoftwareLicenseTest() {
-        super(CATEGORY, NAME, null, targets);
+    public static Stream<Arguments> parameterProvider() {
+        return Stream.of(Arguments.of(ID, ApacheSoftwareLicenseTest.id, ApacheSoftwareLicenseTest.name, null, targets));
     }
+
     /*
       
     

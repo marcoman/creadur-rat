@@ -18,18 +18,18 @@
  */
 package org.apache.rat.analysis.matchers;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.apache.rat.analysis.IHeaderMatcher;
 import org.apache.rat.analysis.IHeaderMatcher.State;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 public class SPDXMatcherTest {
 
     IHeaderMatcher target = SPDXMatcherFactory.INSTANCE.create("hello");
 
-    @Before
+    @BeforeEach
     public void setup() {
         target.reset();
     }
@@ -71,5 +71,16 @@ public class SPDXMatcherTest {
         assertEquals(State.t, target.currentState());
         target.reset();
         assertEquals(State.i, target.currentState());
+    }
+    
+    @Test
+    public void testResetClearsLastMatch() {
+        
+        assertEquals(State.i, target.currentState());
+        assertEquals(State.t, target.matches("SPDX-License-Identifier: hello"));
+        assertEquals(State.t, target.currentState());
+        target.reset();
+        assertEquals(State.i, target.currentState());
+        assertEquals(State.i, target.matches("Something weird"));;
     }
 }

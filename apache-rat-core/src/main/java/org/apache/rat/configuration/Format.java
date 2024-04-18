@@ -28,7 +28,7 @@ import java.util.Arrays;
 import org.apache.rat.ConfigurationException;
 
 /**
- * An enumeration of the types of files that can contain the configurtion
+ * An enumeration of the types of files that can contain the configuration
  * information.
  */
 public enum Format {
@@ -37,7 +37,7 @@ public enum Format {
     /** A plain text file */
     TXT(null, "txt", "text");
 
-    private String[] suffix;
+    private final String[] suffix;
 
     private Constructor<MatcherReader> matcherReader;
     private Constructor<LicenseReader> licenseReader;
@@ -92,7 +92,7 @@ public enum Format {
         String[] parts = name.split("\\.");
         String suffix = parts[parts.length - 1];
         for (Format f : Format.values()) {
-            if (Arrays.stream(f.suffix).anyMatch(suffix::equals)) {
+            if (Arrays.asList(f.suffix).contains(suffix)) {
                 return f;
             }
         }
@@ -101,7 +101,7 @@ public enum Format {
 
    /**
     * Determine the {@code Format} from a URL.
-    * @param name the URL to check.
+    * @param url the URL to check.
     * @return the Format
     */
    public static Format fromURL(URL url) {
@@ -110,8 +110,9 @@ public enum Format {
 
    /**
     * Determine the {@code Format} from a File.
-    * @param name the File to check.
+    * @param file the File to check.
     * @return the Format
+    * @throws MalformedURLException in case the file cannot be found.
     */
    public static Format fromFile(File file) throws MalformedURLException {
         return Format.fromURL(file.toURI().toURL());

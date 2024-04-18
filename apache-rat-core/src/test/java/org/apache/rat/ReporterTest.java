@@ -18,8 +18,8 @@
  */
 package org.apache.rat;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -30,10 +30,13 @@ import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathFactory;
 
+import org.apache.commons.io.filefilter.HiddenFileFilter;
 import org.apache.rat.test.utils.Resources;
 import org.apache.rat.testhelpers.XmlUtils;
+import org.apache.rat.utils.DefaultLog;
 import org.apache.rat.walker.DirectoryWalker;
-import org.junit.Test;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 import org.w3c.dom.Document;
 import org.w3c.dom.NodeList;
 
@@ -48,13 +51,14 @@ public class ReporterTest {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
 
         final String elementsPath = Resources.getResourceDirectory("elements/Source.java");
-        final ReportConfiguration configuration = new ReportConfiguration();
+        final ReportConfiguration configuration = new ReportConfiguration(DefaultLog.INSTANCE);
         configuration.setStyleReport(false);
         configuration.setFrom(defaults);
-        configuration.setReportable(new DirectoryWalker(new File(elementsPath)));
+        configuration.setReportable(new DirectoryWalker(new File(elementsPath), HiddenFileFilter.HIDDEN));
         configuration.setOut(() -> out);
         Reporter.report(configuration);
         Document doc = XmlUtils.toDom(new ByteArrayInputStream(out.toByteArray()));
+        
         XPath xPath = XPathFactory.newInstance().newXPath();
 
         XmlUtils.getNode(doc, xPath, "/rat-report[@timestamp]");
@@ -74,6 +78,7 @@ public class ReporterTest {
 
         NodeList nodeList = (NodeList) xPath.compile("/rat-report/resource").evaluate(doc, XPathConstants.NODESET);
         assertEquals(12, nodeList.getLength());
+
     }
 
     private static final String NL = System.getProperty("line.separator");
@@ -89,15 +94,16 @@ public class ReporterTest {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
 
         final String elementsPath = Resources.getResourceDirectory("elements/Source.java");
-        final ReportConfiguration configuration = new ReportConfiguration();
+        final ReportConfiguration configuration = new ReportConfiguration(DefaultLog.INSTANCE);
         configuration.setFrom(defaults);
-        configuration.setReportable(new DirectoryWalker(new File(elementsPath)));
+        configuration.setReportable(new DirectoryWalker(new File(elementsPath), HiddenFileFilter.HIDDEN));
         configuration.setOut(() -> out);
         Reporter.report(configuration);
 
+        out.flush();
         String document = out.toString();
-        // System.out.println(document);
-        assertTrue("'Generated at' is present in " + document, document.startsWith(HEADER));
+
+        assertTrue(document.startsWith(HEADER), "'Generated at' is present in " + document );
 
         // final int generatedAtLineEnd = document.indexOf(NL, HEADER.length());
         find("^Notes: 2$", document);
@@ -128,7 +134,7 @@ public class ReporterTest {
     }
 
     private void find(String pattern, String document) {
-        assertTrue(String.format("Could not find '%s'", pattern),
-                Pattern.compile(pattern, Pattern.MULTILINE).matcher(document).find());
+        assertTrue(
+                Pattern.compile(pattern, Pattern.MULTILINE).matcher(document).find(), () ->String.format("Could not find '%s'", pattern));
     }
 }

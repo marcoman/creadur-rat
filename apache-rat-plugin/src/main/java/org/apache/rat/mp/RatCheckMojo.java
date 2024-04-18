@@ -20,7 +20,8 @@ package org.apache.rat.mp;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -45,6 +46,9 @@ public class RatCheckMojo extends AbstractRatMojo {
      */
     @Parameter(property = "rat.outputFile", defaultValue = "${project.build.directory}/rat.txt")
     private File reportFile;
+
+    @Parameter(property = "rat.scanHiddenDirectories", defaultValue = "false")
+    private boolean scanHiddenDirectories;
 
     /**
      * Output style of the report. Use "plain" (the default) for a plain text report
@@ -109,7 +113,6 @@ public class RatCheckMojo extends AbstractRatMojo {
             return;
         }
         ReportConfiguration config = getConfiguration();
-        config.setFrom(getDefaultsBuilder().build());
         logLicenses(config.getLicenses(LicenseFilter.all));
         final File parent = reportFile.getParentFile();
         if (!parent.mkdirs() && !parent.isDirectory()) {
@@ -170,6 +173,9 @@ public class RatCheckMojo extends AbstractRatMojo {
         if (StringUtils.isNotBlank(copyrightMessage)) {
             configuration.setCopyrightMessage(copyrightMessage);
         }
+        if (scanHiddenDirectories) {
+            configuration.setDirectoryFilter(null);
+        }
         if (reportFile != null) {
             if (!reportFile.exists()) {
                 reportFile.getParentFile().mkdirs();
@@ -182,7 +188,7 @@ public class RatCheckMojo extends AbstractRatMojo {
             } else {
                 configuration.setStyleReport(true);
                 if (!"plain".equalsIgnoreCase(reportStyle)) {
-                    configuration.setStyleSheet(() -> new FileInputStream(reportStyle));
+                    configuration.setStyleSheet(() -> Files.newInputStream(Paths.get(reportStyle)));
                 }
             }
         }

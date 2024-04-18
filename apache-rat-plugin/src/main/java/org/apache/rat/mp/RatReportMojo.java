@@ -25,13 +25,14 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.ResourceBundle;
-import java.nio.charset.StandardCharsets;
+
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.artifact.repository.ArtifactRepository;
 import org.apache.maven.doxia.sink.Sink;
@@ -228,9 +229,9 @@ public class RatReportMojo extends AbstractRatMojo implements MavenMultiPageRepo
     /**
      * Generate a report.
      *
-     * @param sink
-     * @param locale
-     * @throws MavenReportException
+     * @param sink the sink to use for the generation.
+     * @param locale the wanted locale to generate the report, could be null.
+     * @throws MavenReportException if any
      * @deprecated use {@link #generate(Sink, SinkFactory, Locale)} instead.
      */
     @Deprecated
@@ -242,10 +243,10 @@ public class RatReportMojo extends AbstractRatMojo implements MavenMultiPageRepo
      * This method is called when the report generation is invoked by
      * maven-site-plugin.
      *
-     * @param sink
-     * @param sinkFactory
-     * @param locale
-     * @throws MavenReportException
+     * @param sink the sink to use for the generation.
+     * @param sinkFactory the sink factory to use for the generation.
+     * @param locale the wanted locale to generate the report, could be null.
+     * @throws MavenReportException if any
      */
     @Override
     public void generate(Sink sink, SinkFactory sinkFactory, Locale locale) throws MavenReportException {

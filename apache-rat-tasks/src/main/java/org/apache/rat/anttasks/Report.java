@@ -19,10 +19,8 @@
 package org.apache.rat.anttasks;
 
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.FilenameFilter;
-import java.io.IOException;
+import java.io.PrintWriter;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
@@ -38,7 +36,7 @@ import org.apache.rat.configuration.Format;
 import org.apache.rat.configuration.LicenseReader;
 import org.apache.rat.configuration.MatcherReader;
 import org.apache.rat.license.LicenseSetFactory;
-import org.apache.rat.configuration.MatcherBuilderTracker;
+import org.apache.rat.utils.Log;
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.Project;
 import org.apache.tools.ant.Task;
@@ -69,17 +67,18 @@ import org.apache.tools.ant.types.resources.Union;
  */
 public class Report extends Task {
 
-    private Defaults.Builder defaultsBuilder;
+    private final Defaults.Builder defaultsBuilder;
     private final ReportConfiguration configuration;
-    private List<License> licenses = new ArrayList<>();
+    private final List<License> licenses = new ArrayList<>();
+    private final List<Family> families = new ArrayList<>();
     /**
      * will hold any nested resource collection
      */
     private Union nestedResources;
 
     public Report() {
-        configuration = new ReportConfiguration();
-        configuration.setOut(()->new LogOutputStream(this, Project.MSG_INFO));
+        configuration = new ReportConfiguration(new Logger());
+        configuration.setOut(() -> new LogOutputStream(this, Project.MSG_INFO));
         defaultsBuilder = Defaults.builder();
     }
 
@@ -107,18 +106,26 @@ public class Report extends Task {
         licenses.add(lic);
     }
 
+    public void addFamily(Family family) {
+        families.add(family);
+    }
+
     /**
      * 
      * @param styleSheet
-     * @deprecated us {@link #addStyleSheet(File)}
+     * @deprecated use {@link #addStyleSheet(Resource)}
      */
     @Deprecated
     public void addStylesheet(Resource styleSheet) {
         addStyleSheet(styleSheet);
     }
 
+    /**
+     * Adds a given style sheet to the report.
+     * @param styleSheet style sheet to use in this report.
+     */
     public void addStyleSheet(Resource styleSheet) {
-        configuration.setStyleSheet(()->styleSheet.getInputStream());
+        configuration.setStyleSheet(styleSheet::getInputStream);
         configuration.setStyleReport(true);
     }
 
@@ -147,9 +154,9 @@ public class Report extends Task {
             }
             LicenseReader lReader = fmt.licenseReader();
             if (lReader != null) {
-                    lReader.addLicenses(url);
-            configuration.addLicenses(lReader.readLicenses());
-            configuration.addApprovedLicenseCategories(lReader.approvedLicenseId());
+                lReader.addLicenses(url);
+                configuration.addLicenses(lReader.readLicenses());
+                configuration.addApprovedLicenseCategories(lReader.approvedLicenseId());
             }
         } catch (MalformedURLException e) {
             throw new BuildException("Can not read license file " + fileName, e);
@@ -169,9 +176,11 @@ public class Report extends Task {
     public void setAddApprovedLicense(String familyCategory) {
         configuration.addApprovedLicenseCategory(familyCategory);
     }
+
     public void addAddApprovedLicense(String familyCategory) {
         configuration.addApprovedLicenseCategory(familyCategory);
     }
+
     public void setRemoveApprovedLicense(String familyCategory) {
         configuration.removeApprovedLicenseCategory(familyCategory);
     }
@@ -196,21 +205,24 @@ public class Report extends Task {
         }
     }
 
+    public ReportConfiguration getConfiguration() {
+        Defaults defaults = defaultsBuilder.build();
+
+        configuration.setFrom(defaults);
+        configuration.setReportable(new ResourceCollectionContainer(nestedResources));
+        families.stream().map(Family::build).forEach(configuration::addFamily);
+        licenses.stream().map(License::asBuilder)
+                .forEach(l -> configuration.addApprovedLicenseCategory(configuration.addLicense(l).getLicenseFamily()));
+        return configuration;
+    }
+
     /**
      * Generates the report.
      */
     @Override
     public void execute() {
         try {
-            Defaults defaults = defaultsBuilder.build();
-            configuration.setFrom(defaults);
-            configuration.setReportable(new ResourceCollectionContainer(nestedResources));
-            licenses.stream().map(License::build).forEach((l) -> {
-                configuration.addLicense(l);
-                configuration.addApprovedLicenseCategory(l.getLicenseFamily());
-            });
-            validate();
-            Reporter.report(configuration);
+            Reporter.report(validate(getConfiguration()));
         } catch (BuildException e) {
             throw e;
         } catch (Exception ioex) {
@@ -221,15 +233,16 @@ public class Report extends Task {
     /**
      * validates the task's configuration.
      */
-    private void validate() {
+    private ReportConfiguration validate(ReportConfiguration cfg) {
         try {
-            configuration.validate(s -> log(s, Project.MSG_WARN));
+            cfg.validate(s -> log(s, Project.MSG_WARN));
         } catch (ConfigurationException e) {
             throw new BuildException(e.getMessage(), e.getCause());
         }
         if (nestedResources == null) {
             throw new BuildException("You must specify at least one file to create the report for.");
         }
+        return cfg;
     }
 
     /**
@@ -271,12 +284,45 @@ public class Report extends Task {
 
         @Override
         public String[] getValues() {
-            return Arrays.stream(LicenseSetFactory.LicenseFilter.values()).map(LicenseSetFactory.LicenseFilter::name).collect(Collectors.toList())
-                    .toArray(new String[LicenseSetFactory.LicenseFilter.values().length]);
+            return Arrays.stream(LicenseSetFactory.LicenseFilter.values()).map(LicenseSetFactory.LicenseFilter::name)
+                    .collect(Collectors.toList()).toArray(new String[LicenseSetFactory.LicenseFilter.values().length]);
         }
 
         public LicenseSetFactory.LicenseFilter internalFilter() {
             return LicenseSetFactory.LicenseFilter.valueOf(getValue());
         }
+    }
+    
+    private class Logger implements Log {
+
+        private void write(int level, String msg) {
+            try (PrintWriter pw = new PrintWriter(new LogOutputStream(Report.this, level)))
+            {
+               pw.write(msg);
+            }
+        }
+
+        @Override
+        public void log(Level level, String msg) {
+            switch (level) {
+            case DEBUG:
+                write(Project.MSG_DEBUG, msg);
+                break;
+            case INFO:
+                write(Project.MSG_INFO, msg);
+                break;
+            case WARN:
+                write(Project.MSG_WARN, msg);
+                break;
+            case ERROR:
+                write(Project.MSG_ERR, msg);
+                break;
+			case OFF:
+				break;
+			default:
+				break;
+            }
+        }
+        
     }
 }

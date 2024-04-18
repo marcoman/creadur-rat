@@ -18,7 +18,7 @@
  */
 package org.apache.rat.report.xml;
 
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
@@ -33,6 +33,7 @@ import java.util.regex.Pattern;
 import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathFactory;
 
+import org.apache.commons.io.filefilter.HiddenFileFilter;
 import org.apache.rat.analysis.DefaultAnalyserFactory;
 import org.apache.rat.analysis.IHeaderMatcher;
 import org.apache.rat.analysis.matchers.CopyrightMatcher;
@@ -49,9 +50,10 @@ import org.apache.rat.report.xml.writer.impl.base.XmlWriter;
 import org.apache.rat.test.utils.Resources;
 import org.apache.rat.testhelpers.TestingLicense;
 import org.apache.rat.testhelpers.XmlUtils;
+import org.apache.rat.utils.DefaultLog;
 import org.apache.rat.walker.DirectoryWalker;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.w3c.dom.Document;
 
 public class XmlReportTest {
@@ -61,7 +63,7 @@ public class XmlReportTest {
     private IXmlWriter writer;
     private RatReport report;
 
-    @Before
+    @BeforeEach
     public void setUp() throws Exception {
         out = new ByteArrayOutputStream();
         writer = new XmlWriter(new BufferedWriter(new OutputStreamWriter(out)));
@@ -75,7 +77,7 @@ public class XmlReportTest {
         final IHeaderMatcher qosMatcher = new CopyrightMatcher("2004", "2011", "QOS.ch");
         final ILicense qosLic = new TestingLicense("QOS", qosMatcher);
 
-        IDocumentAnalyser analyser = DefaultAnalyserFactory.createDefaultAnalyser(Arrays.asList(asfLic, qosLic));
+        IDocumentAnalyser analyser = DefaultAnalyserFactory.createDefaultAnalyser(DefaultLog.INSTANCE,Arrays.asList(asfLic, qosLic));
         final List<AbstractReport> reporters = new ArrayList<>();
         reporters.add(reporter);
         report = new ClaimReporterMultiplexer(analyser, reporters);
@@ -88,15 +90,14 @@ public class XmlReportTest {
     @Test
     public void baseReport() throws Exception {
         final String elementsPath = Resources.getResourceDirectory("elements/Source.java");
-        DirectoryWalker directory = new DirectoryWalker(new File(elementsPath), IGNORE);
+        DirectoryWalker directory = new DirectoryWalker(new File(elementsPath), IGNORE, HiddenFileFilter.HIDDEN);
         report.startReport();
         report(directory);
         report.endReport();
         writer.closeDocument();
         final String output = out.toString();
-        assertTrue("Preamble and document element are OK",
-                output.startsWith("<?xml version='1.0'?>" + "<rat-report timestamp="));
-        assertTrue("Is well formed", XmlUtils.isWellFormedXml(output));
+        assertTrue(output.startsWith("<?xml version='1.0'?>" + "<rat-report timestamp="), "Preamble and document element are OK");
+        assertTrue(XmlUtils.isWellFormedXml(output),"Is well formed");
 
         XPath xPath = XPathFactory.newInstance().newXPath();
         Document doc = XmlUtils.toDom(new ByteArrayInputStream(out.toByteArray()));

@@ -19,6 +19,7 @@
 package org.apache.rat.analysis;
 
 import java.util.Collection;
+import java.util.Collections;
 
 import org.apache.rat.analysis.matchers.AbstractMatcherContainer;
 import org.apache.rat.license.ILicense;
@@ -35,7 +36,7 @@ class LicenseCollection extends AbstractMatcherContainer implements ILicense {
 
     private static final ILicenseFamily DEFAULT = ILicenseFamily.builder().setLicenseFamilyCategory("Dummy")
             .setLicenseFamilyName("HeaderMatcherCollection default license family").build();
-    private Collection<ILicense> enclosed;
+    private final Collection<ILicense> enclosed;
     private ILicense matchingLicense;
     private State lastState;
 
@@ -45,7 +46,7 @@ class LicenseCollection extends AbstractMatcherContainer implements ILicense {
      */
     public LicenseCollection(Collection<ILicense> enclosed) {
         super(enclosed);
-        this.enclosed = enclosed;
+        this.enclosed = Collections.unmodifiableCollection(enclosed);
         this.matchingLicense = null;
         this.lastState = State.i;
     }
@@ -57,7 +58,7 @@ class LicenseCollection extends AbstractMatcherContainer implements ILicense {
 
     @Override
     public void reset() {
-        enclosed.stream().forEach(ILicense::reset);
+        enclosed.forEach(ILicense::reset);
         this.lastState = State.i;
         this.matchingLicense = null;
     }
@@ -124,5 +125,10 @@ class LicenseCollection extends AbstractMatcherContainer implements ILicense {
     @Override
     public String derivedFrom() {
         return matchingLicense == null ? null : matchingLicense.derivedFrom();
+    }
+    
+    @Override
+    public String getName() {
+        return getLicenseFamily().getFamilyName();
     }
 }

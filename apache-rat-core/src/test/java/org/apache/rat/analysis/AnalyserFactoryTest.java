@@ -18,7 +18,8 @@
  */
 package org.apache.rat.analysis;
 
-import static org.junit.Assert.assertEquals;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -33,8 +34,10 @@ import org.apache.rat.license.ILicense;
 import org.apache.rat.report.claim.impl.xml.SimpleXmlClaimReporter;
 import org.apache.rat.report.xml.writer.impl.base.XmlWriter;
 import org.apache.rat.test.utils.Resources;
-import org.junit.Before;
-import org.junit.Test;
+import org.apache.rat.utils.DefaultLog;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
 
 public class AnalyserFactoryTest {
 
@@ -50,12 +53,12 @@ public class AnalyserFactoryTest {
     private SimpleXmlClaimReporter reporter;
     private IDocumentAnalyser analyser;
 
-    @Before
+    @BeforeEach
     public void setUp() throws Exception {
         out = new StringWriter();
         final XmlWriter writer = new XmlWriter(out);
         reporter = new SimpleXmlClaimReporter(writer);
-        analyser = DefaultAnalyserFactory.createDefaultAnalyser(Arrays.asList(MATCHES_NOTHING_MATCHER));
+        analyser = DefaultAnalyserFactory.createDefaultAnalyser(DefaultLog.INSTANCE, Arrays.asList(MATCHES_NOTHING_MATCHER));
     }
 
     @Test
@@ -64,7 +67,7 @@ public class AnalyserFactoryTest {
                 Resources.getResourceFile("/elements/Text.txt"));
         analyser.analyse(document);
         reporter.report(document);
-        assertEquals("Open standard element", //
+        assertEquals( //
                 "<resource name='src/test/resources/elements/Text.txt'><header-sample>/*\n"
                         + " * Licensed to the Apache Software Foundation (ASF) under one\n"
                         + " * or more contributor license agreements.  See the NOTICE file\n"
@@ -80,8 +83,8 @@ public class AnalyserFactoryTest {
                         + " * KIND, either express or implied.  See the License for the\n"
                         + " * specific language governing permissions and limitations\n" + " * under the License.    \n"
                         + " */\n" + "\n" + "            \n"
-                        + "</header-sample><header-type name='?????'/><license-family name='?????'/><type name='standard'/>",
-                out.toString());
+                        + "</header-sample><header-type name='?????'/><license-family name='Unknown license'/><type name='standard'/>",
+                out.toString(), "Open standard element");
     }
 
     @Test
@@ -90,8 +93,8 @@ public class AnalyserFactoryTest {
                 Resources.getResourceFile("/elements/LICENSE"));
         analyser.analyse(document);
         reporter.report(document);
-        assertEquals("Open note element", "<resource name='src/test/resources/elements/LICENSE'><type name='notice'/>",
-                out.toString());
+        assertEquals("<resource name='src/test/resources/elements/LICENSE'><type name='notice'/>",
+                out.toString(), "Open note element");
     }
 
     @Test
@@ -100,8 +103,9 @@ public class AnalyserFactoryTest {
                 Resources.getResourceFile("/elements/Image.png"));
         analyser.analyse(document);
         reporter.report(document);
-        assertEquals("Open binary element",
-                "<resource name='src/test/resources/elements/Image.png'><type name='binary'/>", out.toString());
+        assertEquals(
+                "<resource name='src/test/resources/elements/Image.png'><type name='binary'/>", 
+                out.toString(), "Open binary element");
     }
 
     @Test
@@ -110,8 +114,8 @@ public class AnalyserFactoryTest {
                 Resources.getResourceFile("/elements/dummy.jar"));
         analyser.analyse(document);
         reporter.report(document);
-        assertEquals("Open archive element",
-                "<resource name='src/test/resources/elements/dummy.jar'><type name='archive'/>", out.toString());
+        assertEquals(
+                "<resource name='src/test/resources/elements/dummy.jar'><type name='archive'/>", out.toString(), "Open archive element");
     }
 
     @Test
@@ -120,7 +124,7 @@ public class AnalyserFactoryTest {
                 Resources.getResourceFile("/elements/dummy.jar"));
         analyser.analyse(document);
         reporter.report(document);
-        assertEquals("Open archive element",
-                "<resource name='src/test/resources/elements/dummy.jar'><type name='archive'/>", out.toString());
+        assertEquals(
+                "<resource name='src/test/resources/elements/dummy.jar'><type name='archive'/>", out.toString(), "Open archive element");
     }
 }

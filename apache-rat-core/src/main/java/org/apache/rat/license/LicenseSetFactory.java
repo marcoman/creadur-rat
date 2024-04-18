@@ -23,7 +23,7 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 
 /**
- * Class to take a set of ILicenses and collecton of approved license categories and extract Subsets.
+ * Class to take a set of ILicenses and collection of approved license categories and extract Subsets.
  */
 public class LicenseSetFactory {
     
@@ -36,7 +36,16 @@ public class LicenseSetFactory {
         /** Only approved licenses are returned */
         approved,
         /** No licenses are returned */
-        none
+        none;
+        
+    	/**
+    	 * Converts from a String to an enum value. 
+    	 * @param s String representation.
+    	 * @return given licenseFilter for the given String representation.
+    	 */
+        static public LicenseFilter fromText(String s) {
+            return LicenseFilter.valueOf(s.toLowerCase());
+        }
     }
 
     private final SortedSet<ILicense> licenses;
@@ -58,14 +67,6 @@ public class LicenseSetFactory {
      */
     public static SortedSet<ILicense> emptyLicenseSet() {
         return new TreeSet<>(ILicense.getComparator());
-    }
-    
-    /**
-     * Create an empty sorted Set with proper comparator.
-     * @return An empty sorted set of ILicenseFamily objects.
-     */
-    public static SortedSet<ILicenseFamily> emptyLicenseFamilySet() {
-        return new TreeSet<>();
     }
 
     /**
@@ -109,7 +110,7 @@ public class LicenseSetFactory {
         case all:
             return extractFamily(licenses);
         case approved:
-            SortedSet<ILicenseFamily> result = LicenseSetFactory.emptyLicenseFamilySet();
+            SortedSet<ILicenseFamily> result = LicenseFamilySetFactory.emptyLicenseFamilySet();
             licenses.stream().map(ILicense::getLicenseFamily)
             .filter(x -> approvedLicenses.contains(x.getFamilyCategory()))
                     .forEach(result::add);
@@ -121,7 +122,7 @@ public class LicenseSetFactory {
     }
     
     /**
-     * Gets the categories fof LicenseFamily objects based on the filter.
+     * Gets the categories of LicenseFamily objects based on the filter.
      * @param filter the types of LicenseFamily objects to return.
      * @return a SortedSet of ILicenseFamily categories.
      */
@@ -151,7 +152,7 @@ public class LicenseSetFactory {
      */
     public static ILicense search(String licenseId, SortedSet<ILicense> licenses) {
         ILicenseFamily searchFamily = ILicenseFamily.builder().setLicenseFamilyCategory(licenseId)
-                .setLicenseFamilyCategory("searching proxy").build();
+                .setLicenseFamilyName("searching proxy").build();
         ILicense target = new ILicense() {
     
             @Override
@@ -188,6 +189,11 @@ public class LicenseSetFactory {
             public String derivedFrom() {
                 return null;
             }
+            
+            @Override
+            public String getName() {
+                return searchFamily.getFamilyName();
+            }
     
             @Override
             public State finalizeState() {
@@ -214,15 +220,5 @@ public class LicenseSetFactory {
         SortedSet<ILicense> part = licenses.tailSet(target);
         return (!part.isEmpty() && part.first().compareTo(target) == 0) ? part.first() : null;
     }
-
-    /**
-     * Search a SortedSet of ILicenseFamily instances looking for a matching instance.
-     * @param target The instance to serch  for.
-     * @param licenseFamilies the license families to search
-     * @return
-     */
-    public static ILicenseFamily search(ILicenseFamily target, SortedSet<ILicenseFamily> licenseFamilies) {
-        SortedSet<ILicenseFamily> part = licenseFamilies.tailSet(target);
-        return (!part.isEmpty() && part.first().compareTo(target) == 0) ? part.first() : null;
-    }
+    
 }
