@@ -1,0 +1,25 @@
+<gradleEnterprise>
+  <server>
+    <url>https://develocity-field.gradle.com</url>
+    <!-- adjust depending on whether trusted cert is already configured in GE: -->
+  </server>
+  <buildScan>
+    <publish>ALWAYS</publish>
+    <capture>
+      <goalInputFiles>true</goalInputFiles>
+    </capture>
+    <!-- adjust to your CI provider: -->
+    <backgroundBuildScanUpload>true</backgroundBuildScanUpload>
+  </buildScan>
+  <buildCache>
+    <local>
+      <enabled>true</enabled>
+    </local>
+    <remote>
+      <enabled>true</enabled>
+      <server>
+        <allowInsecureProtocol>true</allowInsecureProtocol>
+      </server>
+    </remote>
+  </buildCache>
+</gradleEnterprise>
