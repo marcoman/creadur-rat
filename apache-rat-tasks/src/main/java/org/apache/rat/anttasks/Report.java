@@ -18,11 +18,10 @@
 */
 package org.apache.rat.anttasks;
 
-import java.io.File;
-import java.io.FilenameFilter;
-import java.io.PrintWriter;
+import java.io.*;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -95,7 +94,7 @@ public class Report extends Task {
     }
 
     public void setInputFileFilter(FilenameFilter inputFileFilter) {
-        configuration.setInputFileFilter(inputFileFilter);
+        configuration.setFilesToIgnore(inputFileFilter);
     }
 
     public void setReportFile(File reportFile) {
@@ -206,7 +205,7 @@ public class Report extends Task {
     }
 
     public ReportConfiguration getConfiguration() {
-        Defaults defaults = defaultsBuilder.build();
+        Defaults defaults = defaultsBuilder.build(configuration.getLog());
 
         configuration.setFrom(defaults);
         configuration.setReportable(new ResourceCollectionContainer(nestedResources));
@@ -222,7 +221,9 @@ public class Report extends Task {
     @Override
     public void execute() {
         try {
-            Reporter.report(validate(getConfiguration()));
+            Reporter r = new Reporter(validate(getConfiguration()));
+            r.output(null, () -> new ReportConfiguration.NoCloseOutputStream(System.out));
+            r.output();
         } catch (BuildException e) {
             throw e;
         } catch (Exception ioex) {
@@ -317,10 +318,9 @@ public class Report extends Task {
             case ERROR:
                 write(Project.MSG_ERR, msg);
                 break;
-			case OFF:
-				break;
-			default:
-				break;
+            case OFF:
+            default:
+                break;
             }
         }
         

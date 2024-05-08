@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.nio.charset.StandardCharsets;
 
 import org.apache.rat.api.Document;
 import org.apache.rat.api.MetaData;
@@ -47,11 +48,10 @@ class ResourceCollectionContainer implements IReportable {
 
     @Override
     public void run(RatReport report) throws RatException {
-        ResourceDocument document = new ResourceDocument();
+        ResourceDocument document = null;
         for (Resource r : rc) {
             if (!r.isDirectory()) {
-                document.setResource(r);
-                document.getMetaData().clear();
+                document = new ResourceDocument(r);
                 report.report(document);
             }
         }
@@ -59,17 +59,18 @@ class ResourceCollectionContainer implements IReportable {
 
     private static class ResourceDocument implements Document {
 
-        private Resource resource;
-        private final MetaData metaData = new MetaData();
+        private final Resource resource;
+        private final MetaData metaData;
 
-        private void setResource(Resource resource) {
+        private ResourceDocument(Resource resource) {
             this.resource = resource;
+            this.metaData = new MetaData();
         }
 
         @Override
         public Reader reader() throws IOException {
             final InputStream in = resource.getInputStream();
-            return new InputStreamReader(in);
+            return new InputStreamReader(in, StandardCharsets.UTF_8);
         }
 
         @Override

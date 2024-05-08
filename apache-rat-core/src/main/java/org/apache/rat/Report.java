@@ -31,6 +31,7 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.regex.PatternSyntaxException;
 import java.util.stream.Collectors;
 
@@ -115,7 +116,7 @@ public class Report {
     private static final String LIST_FAMILIES = "list-families";
 
     private static final String LOG_LEVEL = "log-level";
-
+    private static final String DRY_RUN = "dry-run";
     /**
      * Set unstyled XML output
      */
@@ -130,6 +131,33 @@ public class Report {
      * @throws Exception on error.
      */
     public static void main(String[] args) throws Exception {
+        ReportConfiguration configuration = parseCommands(args, Report::printUsage);
+        if (configuration != null) {
+            configuration.validate(DefaultLog.INSTANCE::error);
+            new Reporter(configuration).output();
+        }
+    }
+
+    /**
+     * Parses the standard options to create a ReportConfiguraton.
+     * @param args the arguments to parse
+     * @param helpCmd the help command to run when necessary.
+     * @return a ReportConfiguration or null if Help was printed.
+     * @throws IOException on error.
+     */
+    public static ReportConfiguration parseCommands(String[] args, Consumer<Options> helpCmd) throws IOException {
+        return parseCommands(args, helpCmd, false);
+    }
+    
+    /**
+     * Parses the standard options to create a ReportConfiguraton.
+     * @param args the arguments to parse
+     * @param helpCmd the help command to run when necessary.
+     * @param noArgs If true then the commands do not need extra arguments
+     * @return a ReportConfiguration or null if Help was printed.
+     * @throws IOException on error.
+     */
+    public static ReportConfiguration parseCommands(String[] args, Consumer<Options> helpCmd, boolean noArgs) throws IOException {
         Options opts = buildOptions();
         CommandLine cl;
         try {
@@ -138,7 +166,7 @@ public class Report {
             DefaultLog.INSTANCE.error(e.getMessage());
             DefaultLog.INSTANCE.error("Please use the \"--help\" option to see a list of valid commands and options");
             System.exit(1);
-            return; // dummy return (won't be reached) to avoid Eclipse complaint about possible NPE
+            return null; // dummy return (won't be reached) to avoid Eclipse complaint about possible NPE
                     // for "cl"
         }
 
@@ -152,14 +180,20 @@ public class Report {
             }
         }
         if (cl.hasOption(HELP)) {
-            printUsage(opts);
+            helpCmd.accept(opts);
+            return null;
         }
 
-        args = cl.getArgs();
-        if (args == null || args.length != 1) {
-            printUsage(opts);
+        if (!noArgs) {
+            args = cl.getArgs();
+            if (args == null || args.length != 1) {
+                helpCmd.accept(opts);
+                return null;
+            }
         } else {
-            ReportConfiguration configuration = createConfiguration(args[0], cl);
+            args = new String[] {null};
+        }
+/*            ReportConfiguration configuration = createConfiguration(args[0], cl);
             configuration.validate(DefaultLog.INSTANCE::error);
 
             boolean dryRun = false;
@@ -180,20 +214,31 @@ public class Report {
             }
             
             if (!dryRun) {
-                Reporter.report(configuration);
+                new Reporter(configuration).output();
             }
         }
+*/        ReportConfiguration configuration = createConfiguration(args[0], cl);
+        return configuration;
     }
 
     static ReportConfiguration createConfiguration(String baseDirectory, CommandLine cl) throws IOException {
         final ReportConfiguration configuration = new ReportConfiguration(DefaultLog.INSTANCE);
 
+        configuration.setDryRun(cl.hasOption(DRY_RUN));
+        if (cl.hasOption(LIST_FAMILIES)) {
+           configuration.listFamilies( LicenseFilter.valueOf(cl.getOptionValue(LIST_FAMILIES).toLowerCase()));
+        }
+        
+        if (cl.hasOption(LIST_LICENSES)) {
+            configuration.listFamilies( LicenseFilter.valueOf(cl.getOptionValue(LIST_LICENSES).toLowerCase()));
+        }
+        
         if (cl.hasOption('o')) {
             configuration.setOut(new File(cl.getOptionValue('o')));
         }
 
         if (cl.hasOption(SCAN_HIDDEN_DIRECTORIES)) {
-            configuration.setDirectoryFilter(null);
+            configuration.setDirectoriesToIgnore(null);
         }
 
         if (cl.hasOption('a') || cl.hasOption('A')) {
@@ -205,14 +250,14 @@ public class Report {
             String[] excludes = cl.getOptionValues(EXCLUDE_CLI);
             if (excludes != null) {
                 final FilenameFilter filter = parseExclusions(Arrays.asList(excludes));
-                configuration.setInputFileFilter(filter);
+                configuration.setFilesToIgnore(filter);
             }
         } else if (cl.hasOption(EXCLUDE_FILE_CLI)) {
             String excludeFileName = cl.getOptionValue(EXCLUDE_FILE_CLI);
             if (excludeFileName != null) {
                 final FilenameFilter filter = parseExclusions(
                         FileUtils.readLines(new File(excludeFileName), StandardCharsets.UTF_8));
-                configuration.setInputFileFilter(filter);
+                configuration.setFilesToIgnore(filter);
             }
         }
 
@@ -232,7 +277,7 @@ public class Report {
                 if (url == null) {
                     ioSupplier = () -> Files.newInputStream(Paths.get(style[0]));
                 } else {
-                    ioSupplier = () -> url.openStream();
+                    ioSupplier = url::openStream;
                 }
                 configuration.setStyleSheet(ioSupplier);
             }
@@ -247,9 +292,11 @@ public class Report {
                 defaultBuilder.add(fn);
             }
         }
-        Defaults defaults = defaultBuilder.build();
+        Defaults defaults = defaultBuilder.build(DefaultLog.INSTANCE);
         configuration.setFrom(defaults);
-        configuration.setReportable(getDirectory(baseDirectory, configuration));
+        if (baseDirectory != null) {
+            configuration.setReportable(getDirectory(baseDirectory, configuration));
+        }
         return configuration;
     }
     
@@ -285,11 +332,12 @@ public class Report {
     }
 
     static Options buildOptions() {
-        String licFilterValues = String.join(", ", 
-                Arrays.stream(LicenseFilter.values()).map(LicenseFilter::name).collect(Collectors.toList()));
+        String licFilterValues = Arrays.stream(LicenseFilter.values()).map(LicenseFilter::name).collect(Collectors.joining(", "));
 
         Options opts = new Options()
-        
+        .addOption(Option.builder().longOpt(DRY_RUN)
+                .desc("If set do not update the files but generate the reports.")
+                .build())
         .addOption(
                 Option.builder().hasArg(true).longOpt(LIST_FAMILIES)
                 .desc("List the defined license families (default is none). Valid options are: "+licFilterValues+".")
@@ -300,7 +348,6 @@ public class Report {
                 .build())
 
         .addOption(new Option(HELP, "help", false, "Print help for the RAT command line interface and exit."));
-        
 
         Option out = new Option("o", "out", true,
                 "Define the output file where to write a report to (default is System.out).");
@@ -369,13 +416,13 @@ public class Report {
     private static void printUsage(Options opts) {
         HelpFormatter f = new HelpFormatter();
         f.setOptionComparator(new OptionComparator());
-        String header = "\nAvailable options";
+        String header = System.lineSeparator()+"Available options";
 
-        String footer = "\nNOTE:\n" + "Rat is really little more than a grep ATM\n"
-                + "Rat is also rather memory hungry ATM\n" + "Rat is very basic ATM\n"
-                + "Rat highlights possible issues\n" + "Rat reports require interpretation\n"
-                + "Rat often requires some tuning before it runs well against a project\n"
-                + "Rat relies on heuristics: it may miss issues\n";
+        String footer = String.format("%nNOTE:%nRat is really little more than a grep ATM%n"
+                + "Rat is also rather memory hungry ATM%n" + "Rat is very basic ATM%n"
+                + "Rat highlights possible issues%n" + "Rat reports require interpretation%n"
+                + "Rat often requires some tuning before it runs well against a project%n"
+                + "Rat relies on heuristics: it may miss issues%n");
 
         f.printHelp("java -jar apache-rat/target/apache-rat-CURRENT-VERSION.jar [options] [DIR|TARBALL]", header, opts,
                 footer, false);
@@ -404,11 +451,11 @@ public class Report {
             }
 
             if (base.isDirectory()) {
-                return new DirectoryWalker(base, config.getInputFileFilter(), config.getDirectoryFilter());
+                return new DirectoryWalker(base, config.getFilesToIgnore(), config.getDirectoriesToIgnore());
             }
 
             try {
-                return new ArchiveWalker(base, config.getInputFileFilter());
+                return new ArchiveWalker(base, config.getFilesToIgnore());
             } catch (IOException ex) {
                 config.getLog().log(Level.ERROR, "file '"+baseDirectory+"' is not valid gzip data.");
                 return null;
@@ -421,7 +468,7 @@ public class Report {
     /**
      * This class implements the {@code Comparator} interface for comparing Options.
      */
-    private static class OptionComparator implements Comparator<Option>, Serializable {
+    public static class OptionComparator implements Comparator<Option>, Serializable {
         /** The serial version UID. */
         private static final long serialVersionUID = 5305467873966684014L;
 

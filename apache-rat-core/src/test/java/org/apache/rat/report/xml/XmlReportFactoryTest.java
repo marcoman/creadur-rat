@@ -21,7 +21,6 @@ package org.apache.rat.report.xml;
 import static org.assertj.core.api.Assertions.fail;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -32,9 +31,9 @@ import java.util.regex.Pattern;
 
 import org.apache.commons.io.filefilter.HiddenFileFilter;
 import org.apache.rat.ConfigurationException;
+import org.apache.rat.Defaults;
 import org.apache.rat.ReportConfiguration;
-import org.apache.rat.analysis.IHeaderMatcher.State;
-import org.apache.rat.api.MetaData;
+import org.apache.rat.api.Document;
 import org.apache.rat.license.ILicense;
 import org.apache.rat.license.ILicenseFamily;
 import org.apache.rat.report.RatReport;
@@ -52,8 +51,7 @@ import org.junit.jupiter.api.Test;
 
 public class XmlReportFactoryTest {
 
-    private static final Pattern IGNORE_EMPTY = Pattern.compile(".svn|Empty.txt");
-    private ILicenseFamily family = ILicenseFamily.builder().setLicenseFamilyCategory("TEST")
+    private final ILicenseFamily family = ILicenseFamily.builder().setLicenseFamilyCategory("TEST")
             .setLicenseFamilyName("Testing family").build();
 
     private StringWriter out;
@@ -73,13 +71,13 @@ public class XmlReportFactoryTest {
     @Test
     public void standardReport() throws Exception {
         final String elementsPath = Resources.getResourceDirectory("elements/Source.java");
-
-        
-        final TestingLicense testingLicense = new TestingLicense(new TestingMatcher(true), family);
-
-        DirectoryWalker directory = new DirectoryWalker(new File(elementsPath), IGNORE_EMPTY, HiddenFileFilter.HIDDEN);
-        final ClaimStatistic statistic = new ClaimStatistic();
         final ReportConfiguration configuration = new ReportConfiguration(DefaultLog.INSTANCE);
+        final TestingLicense testingLicense = new TestingLicense(new TestingMatcher(true), family);
+        configuration.setFrom(Defaults.builder().build(DefaultLog.INSTANCE));
+
+        DirectoryWalker directory = new DirectoryWalker(new File(elementsPath), configuration.getFilesToIgnore(), HiddenFileFilter.HIDDEN);
+        final ClaimStatistic statistic = new ClaimStatistic();
+
         configuration.addLicense(testingLicense);
         RatReport report = XmlReportFactory.createStandardReport(writer, statistic, configuration);
         report.startReport();
@@ -87,25 +85,21 @@ public class XmlReportFactoryTest {
         report.endReport();
         writer.closeDocument();
         final String output = out.toString();
-        assertTrue(
-                output.startsWith("<?xml version='1.0'?>" + "<rat-report timestamp="), "Preamble and document element are OK");
+        assertTrue(output.startsWith("<?xml version='1.0'?>" + "<rat-report timestamp="),
+                "Preamble and document element are OK");
 
-        assertTrue( XmlUtils.isWellFormedXml(output), "Is well formed");
-        assertEquals(Integer.valueOf(2),
-                statistic.getDocumentCategoryMap().get(MetaData.RAT_DOCUMENT_CATEGORY_VALUE_BINARY), "Binary files");
-        assertEquals(Integer.valueOf(2),
-                statistic.getDocumentCategoryMap().get(MetaData.RAT_DOCUMENT_CATEGORY_VALUE_NOTICE), "Notice files");
-        assertEquals(Integer.valueOf(6),
-                statistic.getDocumentCategoryMap().get(MetaData.RAT_DOCUMENT_CATEGORY_VALUE_STANDARD), "Standard files");
-        assertEquals(Integer.valueOf(1),
-                statistic.getDocumentCategoryMap().get(MetaData.RAT_DOCUMENT_CATEGORY_VALUE_ARCHIVE), "Archives");
+        assertTrue(XmlUtils.isWellFormedXml(output), "Is well formed");
+        assertEquals(2, statistic.getCounter(Document.Type.BINARY), "Binary files");
+        assertEquals(2, statistic.getCounter(Document.Type.NOTICE), "Notice files");
+        assertEquals(8, statistic.getCounter(Document.Type.STANDARD), "Standard files");
+        assertEquals(1, statistic.getCounter(Document.Type.ARCHIVE), "Archives");
     }
 
     @Test
     public void testNoLicense() throws Exception {
 
         final ILicense mockLicense = mock(ILicense.class);
-        when(mockLicense.matches(any())).thenReturn(State.t);
+        when(mockLicense.matches(any())).thenReturn(true);
         when(mockLicense.getLicenseFamily()).thenReturn(family);
 
         final ClaimStatistic statistic = new ClaimStatistic();
