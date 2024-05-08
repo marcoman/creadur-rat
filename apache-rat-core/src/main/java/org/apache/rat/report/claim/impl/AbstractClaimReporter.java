@@ -22,6 +22,7 @@ package org.apache.rat.report.claim.impl;
 import org.apache.rat.api.Document;
 import org.apache.rat.api.MetaData;
 import org.apache.rat.api.RatException;
+import org.apache.rat.license.ILicense;
 import org.apache.rat.report.AbstractReport;
 
 
@@ -32,87 +33,37 @@ import org.apache.rat.report.AbstractReport;
  */
 public abstract class AbstractClaimReporter extends AbstractReport {
     /**
-     * Empty default implementation.
-     * @param documentCategoryName name of the category
+     * Increment the document type counter.
+     * The default implementations does nothing.
+     * @param type The document type counter to increment.
      */
-    protected void handleDocumentCategoryClaim(String documentCategoryName) {
+    protected void handleDocumentCategoryClaim(Document.Type type) {
         // Does nothing
     }
 
     /**
-     * Empty default implementation.
-     * @param licenseApproved name of the approved license
+     * Increment the approved license claim.
+     * The default implementation does nothing.
+     * @param metadata The metadata for the document
      */
-    protected void handleApprovedLicenseClaim(String licenseApproved) {
+    protected void handleApprovedLicenseClaim(MetaData metadata) {
         // Does nothing
     }
 
     /**
-     * Empty default implementation.
-     * @param licenseFamilyName name of the license family
+     * Increment the counts associated with the license
+     * The default implementation does nothing.
+     * @param license the license to record the category for.
      */
-    protected void handleLicenseFamilyNameClaim(String licenseFamilyName) {
-        // Does Nothing
-    }
-
-    /**
-     * Empty default implementation.
-     * @param headerCategory name of the header category
-     */
-    protected void handleHeaderCategoryClaim(String headerCategory) {
+    protected void handleLicenseClaim(ILicense license) {
         // Does nothing
     }
 
-    private void writeDocumentClaim(Document subject)  {
-        final MetaData metaData = subject.getMetaData();
-        writeHeaderCategory(metaData);
-        writeLicenseFamilyName(metaData);
-        writeDocumentCategory(metaData);
-        writeApprovedLicenseClaim(metaData);
-    }
-
-    private void writeApprovedLicenseClaim(final MetaData metaData) {
-        final MetaData.Datum approvedLicenseDatum = metaData.get(MetaData.RAT_URL_APPROVED_LICENSE);
-        if (approvedLicenseDatum != null) {
-            final String approvedLicense = approvedLicenseDatum.getValue();
-            if (approvedLicense != null) {
-                handleApprovedLicenseClaim(approvedLicense);
-            }
-        }
-    }
-
-    private void writeHeaderCategory(final MetaData metaData) {
-        final MetaData.Datum headerCategoryDatum = metaData.get(MetaData.RAT_URL_HEADER_CATEGORY);
-        if (headerCategoryDatum != null) {
-            final String headerCategory = headerCategoryDatum.getValue();
-            if (headerCategory != null) {
-                handleHeaderCategoryClaim(headerCategory);
-            }
-        }
-    }
-
-    private void writeLicenseFamilyName(final MetaData metaData) {
-        final MetaData.Datum licenseFamilyNameDatum = metaData.get(MetaData.RAT_URL_LICENSE_FAMILY_NAME);
-        if (licenseFamilyNameDatum != null) {
-            final String licenseFamilyName = licenseFamilyNameDatum.getValue();
-            if (licenseFamilyName != null) {
-                handleLicenseFamilyNameClaim(licenseFamilyName);
-            }
-        }
-    }
-    
-    private void writeDocumentCategory(final MetaData metaData) {
-        final MetaData.Datum documentCategoryDatum = metaData.get(MetaData.RAT_URL_DOCUMENT_CATEGORY);
-        if (documentCategoryDatum != null) {
-            final String documentCategory = documentCategoryDatum.getValue();
-            if (documentCategory != null) {
-                handleDocumentCategoryClaim(documentCategory);
-            }
-        }
-    }
-    
     @Override
     public void report(Document subject) throws RatException {
-        writeDocumentClaim(subject);
+        final MetaData metaData = subject.getMetaData();
+        metaData.licenses().forEach(this::handleLicenseClaim);
+        handleDocumentCategoryClaim(metaData.getDocumentType());
+        handleApprovedLicenseClaim(metaData);
     }
 }

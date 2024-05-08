@@ -20,7 +20,7 @@
   <parent>
     <groupId>org.apache</groupId>
     <artifactId>apache</artifactId>
-    <version>31</version>
+    <version>32</version>
   </parent>
   <groupId>org.apache.rat</groupId>
   <artifactId>apache-rat-project</artifactId>
@@ -56,10 +56,10 @@ agnostic home for software distribution comprehension and audit tools.
     <mavenVersion>3.9.6</mavenVersion>
     <creadur.jira.id>RAT</creadur.jira.id>
     <!-- maven plugin versions -->
-    <mavenPluginPluginVersion>3.12.0</mavenPluginPluginVersion>
+    <mavenPluginPluginVersion>3.13.0</mavenPluginPluginVersion>
     <mavenChangesVersion>2.12.1</mavenChangesVersion>
     <mavenJavadocPluginVersion>3.6.3</mavenJavadocPluginVersion>
-    <mavenPmdPluginVersion>3.21.2</mavenPmdPluginVersion>
+    <mavenPmdPluginVersion>3.22.0</mavenPmdPluginVersion>
     <!-- Used to generate download page for RAT during site builds, please adapt versions manually BEFORE doing a release -->
     <!-- START - adapat manually before doing a release -->
     <previousRatVersion>0.17</previousRatVersion>
@@ -87,17 +87,12 @@ agnostic home for software distribution comprehension and audit tools.
       <dependency>
         <groupId>commons-cli</groupId>
         <artifactId>commons-cli</artifactId>
-        <version>1.6.0</version>
+        <version>1.7.0</version>
       </dependency>
       <dependency>
         <groupId>org.apache.commons</groupId>
         <artifactId>commons-collections4</artifactId>
         <version>4.4</version>
-      </dependency>
-      <dependency>
-        <groupId>commons-beanutils</groupId>
-        <artifactId>commons-beanutils</artifactId>
-        <version>1.9.4</version>
       </dependency>
       <dependency>
         <groupId>commons-io</groupId>
@@ -162,6 +157,11 @@ agnostic home for software distribution comprehension and audit tools.
         <version>3.25.3</version>
         <scope>test</scope>
       </dependency>
+      <dependency>
+        <groupId>org.apache.tika</groupId>
+        <artifactId>tika-core</artifactId>
+        <version>2.9.2</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
   <reporting>
@@ -199,6 +199,10 @@ agnostic home for software distribution comprehension and audit tools.
             </reports>
           </reportSet>
         </reportSets>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-checkstyle-plugin</artifactId>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
@@ -285,6 +289,10 @@ agnostic home for software distribution comprehension and audit tools.
         <groupId>org.apache.rat</groupId>
         <artifactId>apache-rat-plugin</artifactId>
       </plugin>
+      <plugin>
+        <groupId>com.github.spotbugs</groupId>
+        <artifactId>spotbugs-maven-plugin</artifactId>
+      </plugin>
     </plugins>
   </reporting>
   <build>
@@ -297,6 +305,38 @@ agnostic home for software distribution comprehension and audit tools.
         if ours is different.
       -->
       <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-checkstyle-plugin</artifactId>
+          <version>3.3.1</version>
+        </plugin>
+        <plugin>
+          <groupId>com.github.spotbugs</groupId>
+          <artifactId>spotbugs-maven-plugin</artifactId>
+          <version>4.8.5.0</version>
+          <configuration>
+            <!-- RAT-369: as spotbugs does not allow setting a global (numeric) threshold of currently accepted errors/bugs we do not fail the build -->
+            <failOnError>false</failOnError>
+            <!-- we only want to see our own problems and in all subpackages -->
+            <onlyAnalyze>org.apache.rat.-</onlyAnalyze>
+            <!-- in order to have a global spotbugs configuration an exclusion file needs to exist in all submodules -->
+            <excludeFilterFile>${basedir}/spotbugs_ignore.xml</excludeFilterFile>
+            <plugins>
+              <plugin>
+                <groupId>com.h3xstream.findsecbugs</groupId>
+                <artifactId>findsecbugs-plugin</artifactId>
+                <version>1.13.0</version>
+              </plugin>
+            </plugins>
+          </configuration>
+          <executions>
+            <execution>
+              <goals>
+                <goal>check</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-antrun-plugin</artifactId>
@@ -440,6 +480,14 @@ agnostic home for software distribution comprehension and audit tools.
       </plugins>
     </pluginManagement>
     <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-checkstyle-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>com.github.spotbugs</groupId>
+        <artifactId>spotbugs-maven-plugin</artifactId>
+      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-antrun-plugin</artifactId>
@@ -670,6 +718,7 @@ agnostic home for software distribution comprehension and audit tools.
     <module>apache-rat-plugin</module>
     <module>apache-rat-tasks</module>
     <module>apache-rat</module>
+    <module>apache-rat-tools</module>
   </modules>
   <licenses>
     <license>
