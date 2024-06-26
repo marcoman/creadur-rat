@@ -44,9 +44,9 @@ import java.util.List;
 import java.util.SortedSet;
 import java.util.function.Function;
 
-import org.apache.commons.io.filefilter.AndFileFilter;
 import org.apache.commons.io.filefilter.DirectoryFileFilter;
 import org.apache.commons.io.filefilter.FalseFileFilter;
+import org.apache.commons.io.filefilter.OrFileFilter;
 import org.apache.commons.io.function.IOSupplier;
 import org.apache.rat.ReportConfiguration.NoCloseOutputStream;
 import org.apache.rat.analysis.IHeaderMatcher;
@@ -56,9 +56,10 @@ import org.apache.rat.license.ILicense;
 import org.apache.rat.license.ILicenseFamily;
 import org.apache.rat.license.LicenseSetFactory.LicenseFilter;
 import org.apache.rat.report.IReportable;
+import org.apache.rat.testhelpers.TestingLog;
 import org.apache.rat.testhelpers.TestingLicense;
+import org.apache.rat.testhelpers.TestingMatcher;
 import org.apache.rat.utils.DefaultLog;
-import org.apache.rat.utils.Log;
 import org.apache.rat.utils.Log.Level;
 import org.apache.rat.utils.ReportingSet.Options;
 import org.apache.rat.walker.NameBasedHiddenFileFilter;
@@ -69,11 +70,11 @@ import org.mockito.Mockito;
 public class ReportConfigurationTest {
 
     private ReportConfiguration underTest;
-    private LoggingCapture log;
+    private TestingLog log;
 
     @BeforeEach
     public void setup() {
-        log = new LoggingCapture();
+        log = new TestingLog();
         underTest = new ReportConfiguration(log);
     }
 
@@ -157,7 +158,7 @@ public class ReportConfigurationTest {
     private ILicense testingLicense(String category, String name) {
         ILicenseFamily family = ILicenseFamily.builder().setLicenseFamilyCategory(category).setLicenseFamilyName(name)
                 .build();
-        return new TestingLicense( family );
+        return new TestingLicense( category, new TestingMatcher(), family );
     }
 
     @Test
@@ -189,10 +190,9 @@ public class ReportConfigurationTest {
     @Test
     public void filesToIgnoreTest() {
 
-        assertThat(underTest.getFilesToIgnore()).isNull();
+        assertThat(underTest.getFilesToIgnore()).isExactlyInstanceOf(FalseFileFilter.class);
 
-        underTest.setFrom(Defaults.builder().build(DefaultLog.INSTANCE));
-        assertThat(underTest.getFilesToIgnore()).isNotNull();
+        underTest.setFrom(Defaults.builder().build(DefaultLog.getInstance()));
         assertThat(underTest.getFilesToIgnore()).isExactlyInstanceOf(FalseFileFilter.class);
 
         FilenameFilter filter = mock(FilenameFilter.class);
@@ -202,18 +202,34 @@ public class ReportConfigurationTest {
 
     @Test
     public void directoriesToIgnoreTest() {
-        assertThat(underTest.getDirectoriesToIgnore()).isNull();
+        assertThat(underTest.getDirectoriesToIgnore()).isExactlyInstanceOf(NameBasedHiddenFileFilter.class);
 
-        underTest.setFrom(Defaults.builder().build(DefaultLog.INSTANCE));
-        assertThat(underTest.getDirectoriesToIgnore()).isNotNull();
+        underTest.setFrom(Defaults.builder().build(DefaultLog.getInstance()));
         assertThat(underTest.getDirectoriesToIgnore()).isExactlyInstanceOf(NameBasedHiddenFileFilter.class);
 
         underTest.setDirectoriesToIgnore(DirectoryFileFilter.DIRECTORY);
         underTest.addDirectoryToIgnore(NameBasedHiddenFileFilter.HIDDEN);
-        assertThat(underTest.getDirectoriesToIgnore()).isExactlyInstanceOf(AndFileFilter.class);
+        assertThat(underTest.getDirectoriesToIgnore()).isExactlyInstanceOf(OrFileFilter.class);
 
         underTest.setDirectoriesToIgnore(null);
         assertThat(underTest.getDirectoriesToIgnore()).isExactlyInstanceOf(FalseFileFilter.class);
+    }
+
+    @Test
+    public void archiveProcessingTest() {
+        assertThat(underTest.getArchiveProcessing()).isEqualTo(ReportConfiguration.Processing.NOTIFICATION);
+
+        underTest.setFrom(Defaults.builder().build(DefaultLog.getInstance()));
+        assertThat(underTest.getArchiveProcessing()).isEqualTo(ReportConfiguration.Processing.NOTIFICATION);
+
+        underTest.setArchiveProcessing(ReportConfiguration.Processing.ABSENCE);
+        assertThat(underTest.getArchiveProcessing()).isEqualTo(ReportConfiguration.Processing.ABSENCE);
+
+        underTest.setArchiveProcessing(ReportConfiguration.Processing.PRESENCE);
+        assertThat(underTest.getArchiveProcessing()).isEqualTo(ReportConfiguration.Processing.PRESENCE);
+
+        underTest.setArchiveProcessing(null);
+        assertThat(underTest.getArchiveProcessing()).isEqualTo(ReportConfiguration.Processing.NOTIFICATION);
     }
 
     @Test
@@ -342,7 +358,7 @@ public class ReportConfigurationTest {
     public void testValidate() {
         final StringBuilder sb = new StringBuilder();
         try {
-            underTest.validate(s -> sb.append(s));
+            underTest.validate(sb::append);
             fail("should have thrown ConfigurationException");
         } catch (ConfigurationException e) {
             assertThat(e.getMessage()).isEqualTo("Reportable may not be null");
@@ -351,7 +367,7 @@ public class ReportConfigurationTest {
 
         underTest.setReportable(mock(IReportable.class));
         try {
-            underTest.validate(s -> sb.append(s));
+            underTest.validate(sb::append);
             fail("should have thrown ConfigurationException");
         } catch (ConfigurationException e) {
             assertThat(e.getMessage()).isEqualTo("You must specify at least one license");
@@ -360,7 +376,7 @@ public class ReportConfigurationTest {
 
         underTest.addLicense(testingLicense("valid", "Validation testing license"));
         try {
-            underTest.validate(s -> sb.append(s));
+            underTest.validate(sb::append);
             fail("should have thrown ConfigurationException");
         } catch (ConfigurationException e) {
             assertThat(e.getMessage()).isEqualTo("Stylesheet must be specified if report styling is selected");
@@ -369,12 +385,12 @@ public class ReportConfigurationTest {
 
         underTest.setStyleSheet(()->mock(InputStream.class));
         underTest.setStyleReport(false);
-        underTest.validate(s -> sb.append(s));
+        underTest.validate(sb::append);
         assertThat(sb.toString()).isEqualTo("Ignoring stylesheet because styling is not selected");
 
         final StringBuilder sb2 = new StringBuilder();
         underTest.setStyleReport(true);
-        underTest.validate(s -> sb2.append(s));
+        underTest.validate(sb2::append);
         assertThat(sb2.length()).isEqualTo(0);
     }
     
@@ -399,20 +415,20 @@ public class ReportConfigurationTest {
     public void logFamilyCollisionTest() {
         // setup
         underTest.addFamily(ILicenseFamily.builder().setLicenseFamilyCategory("CAT").setLicenseFamilyName("name"));
-        assertFalse(log.captured.toString().contains("CAT"));
+        assertFalse(log.getCaptured().contains("CAT"));
        
         // verify default collision logs WARNING
         underTest.addFamily(ILicenseFamily.builder().setLicenseFamilyCategory("CAT").setLicenseFamilyName("name2"));
-        assertTrue(log.captured.toString().contains("WARN"), ()->"default value not WARN");
-        assertTrue(log.captured.toString().contains("CAT"), ()->"'CAT' not found");
+        assertTrue(log.getCaptured().contains("WARN"), "default value not WARN");
+        assertTrue(log.getCaptured().contains("CAT"), "'CAT' not found");
         
         // verify level setting works.
         for (Level l : Level.values()) {
         log.clear();
         underTest.logFamilyCollisions(l);
         underTest.addFamily(ILicenseFamily.builder().setLicenseFamilyCategory("CAT").setLicenseFamilyName("name2"));
-        assertTrue(log.captured.toString().contains("CAT"), ()->"'CAT' not found");
-        assertTrue(log.captured.toString().contains(l.name()), ()->"logging not set to "+l);
+        assertTrue(log.getCaptured().contains("CAT"), "'CAT' not found");
+        assertTrue(log.getCaptured().contains(l.name()), "logging not set to "+l);
         }
 
     }
@@ -420,18 +436,18 @@ public class ReportConfigurationTest {
     @Test
     public void familyDuplicateOptionsTest() {
         underTest.addFamily(ILicenseFamily.builder().setLicenseFamilyCategory("CAT").setLicenseFamilyName("name"));
-        assertFalse(log.captured.toString().contains("CAT"));
+        assertFalse(log.getCaptured().toString().contains("CAT"));
         
         // verify default second setting ignores change
         underTest.addFamily(ILicenseFamily.builder().setLicenseFamilyCategory("CAT").setLicenseFamilyName("name2"));
-        assertTrue(log.captured.toString().contains("CAT"));
+        assertTrue(log.getCaptured().toString().contains("CAT"));
         assertEquals("name", underTest.getLicenseFamilies(LicenseFilter.ALL).stream()
                 .filter(s -> s.getFamilyCategory().equals("CAT  ")).map(s -> s.getFamilyName()).findFirst().get());
         
         underTest.familyDuplicateOption(Options.OVERWRITE);
         // verify second setting ignores change
         underTest.addFamily(ILicenseFamily.builder().setLicenseFamilyCategory("CAT").setLicenseFamilyName("name2"));
-        assertTrue(log.captured.toString().contains("CAT"));
+        assertTrue(log.getCaptured().toString().contains("CAT"));
         assertEquals("name2", underTest.getLicenseFamilies(LicenseFilter.ALL).stream()
                 .filter(s -> s.getFamilyCategory().equals("CAT  ")).map(s -> s.getFamilyName()).findFirst().get());
 
@@ -459,7 +475,7 @@ public class ReportConfigurationTest {
         underTest.addLicense(ILicense.builder().setId("ID").setName("license name2").setFamily(family.getFamilyCategory())
                 .setMatcher( matcher ).setLicenseFamilies(underTest.getLicenseFamilies(LicenseFilter.ALL))
                 .build());
-        assertTrue(log.captured.toString().contains("WARN"));
+        assertTrue(log.getCaptured().contains("WARN"));
         
         log.clear();
         underTest.logLicenseCollisions(Level.ERROR);
@@ -468,7 +484,7 @@ public class ReportConfigurationTest {
         underTest.addLicense(ILicense.builder().setId("ID").setName("license name2").setFamily(family.getFamilyCategory())
                 .setMatcher( matcher ).setLicenseFamilies(underTest.getLicenseFamilies(LicenseFilter.ALL))
                 .build());
-        assertTrue(log.captured.toString().contains("ERROR"));
+        assertTrue(log.getCaptured().contains("ERROR"));
 
     }
     
@@ -487,7 +503,7 @@ public class ReportConfigurationTest {
         
         // verify default second setting ignores change
         underTest.addLicense(makeLicense.apply("license name2"));
-        assertTrue(log.captured.toString().contains("WARN"));
+        assertTrue(log.getCaptured().toString().contains("WARN"));
         assertEquals("license name",
                 underTest.getLicenses(LicenseFilter.ALL).stream().map(ILicense::getName).findFirst().get());
         
@@ -561,30 +577,15 @@ public class ReportConfigurationTest {
         assertThat(config.getCopyrightMessage()).isNull();
         assertThat(config.getFilesToIgnore()).isExactlyInstanceOf(FalseFileFilter.class);
         assertThat(config.isStyleReport()).isTrue();
-        assertThat(config.getStyleSheet()).isNotNull().withFailMessage("Stylesheet should not be null");
-        assertThat(config.getDirectoriesToIgnore()).isNotNull().withFailMessage("Directory filter should not be null");
+        assertThat(config.getStyleSheet()).withFailMessage("Stylesheet should not be null").isNotNull();
+        assertThat(config.getDirectoriesToIgnore()).withFailMessage("Directory filter should not be null").isNotNull();
         assertThat(config.getDirectoriesToIgnore()).isExactlyInstanceOf(NameBasedHiddenFileFilter.class);
         
         validateDefaultApprovedLicenses(config);
         validateDefaultLicenseFamilies(config);
         validateDefaultLicenses(config);
     }
-    
-    private class LoggingCapture implements Log {
 
-        StringBuilder captured = new StringBuilder();
-        
-        public void clear() {
-            captured = new StringBuilder();
-        }
-        
-        @Override
-        public void log(Level level, String msg) {
-            captured.append( String.format("%s: %s%n", level, msg));
-        }
-        
-    }
-    
     static class OutputStreamIntercepter extends OutputStream {
         
         int closeCount = 0;

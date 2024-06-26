@@ -22,6 +22,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 import org.apache.rat.license.ILicense;
@@ -154,6 +155,10 @@ public class MetaData {
      */
     public void reportOnLicense(ILicense license) {
         this.matchedLicenses.add(license);
+    }
+
+    public void removeLicenses(Predicate<ILicense> filter) {
+        this.matchedLicenses.removeIf(filter);
     }
     
     @Override

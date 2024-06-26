@@ -46,15 +46,15 @@ public class XMLConfigurationWriterTest {
 
     @Test
     public void roundTrip() throws RatException {
-        ReportConfiguration config = new ReportConfiguration(DefaultLog.INSTANCE);
-        config.setFrom(Defaults.builder().build(DefaultLog.INSTANCE));
+        ReportConfiguration config = new ReportConfiguration(DefaultLog.getInstance());
+        config.setFrom(Defaults.builder().build(DefaultLog.getInstance()));
         config.listFamilies(LicenseFilter.ALL);
         config.listLicenses(LicenseFilter.ALL);
         XMLConfigurationWriter underTest = new XMLConfigurationWriter(config);
         StringWriter writer = new StringWriter();
         underTest.write(writer);
         writer.flush();
-        System.out.println(writer.toString());
+        System.out.println(writer);
         XMLConfigurationReader reader = new XMLConfigurationReader();
         StringReader strReader = new StringReader(writer.toString());
         reader.read(strReader);
@@ -63,8 +63,8 @@ public class XMLConfigurationWriterTest {
     
     @Test
     public void testGen() throws Exception {
-        ReportConfiguration config = new ReportConfiguration(DefaultLog.INSTANCE);
-        config.setFrom(Defaults.builder().build(DefaultLog.INSTANCE));
+        ReportConfiguration config = new ReportConfiguration(DefaultLog.getInstance());
+        config.setFrom(Defaults.builder().build(DefaultLog.getInstance()));
         config.listFamilies(LicenseFilter.ALL);
         config.listLicenses(LicenseFilter.ALL);
         XMLConfigurationWriter underTest = new XMLConfigurationWriter(config);
@@ -81,9 +81,9 @@ public class XMLConfigurationWriterTest {
         XPath xPath = XPathFactory.newInstance().newXPath();
         Document doc = XmlUtils.toDom(new ByteArrayInputStream(result.getBytes()));
 
-        Node any = (Node) xPath.compile(String.format("/license[@id='GEN']/any")).evaluate(doc, XPathConstants.NODE);
-        assertNotNull(any, () -> "GEN/any node missing");
+        Node any = (Node) xPath.compile("/license[@id='GEN']/any").evaluate(doc, XPathConstants.NODE);
+        assertNotNull(any, "GEN/any node missing");
         assertEquals(0, any.getChildNodes().getLength());
-        assertNotNull(any.getAttributes().getNamedItem("resource"), () -> "'resource' attribute missing");
+        assertNotNull(any.getAttributes().getNamedItem("resource"), "'resource' attribute missing");
     }
 }

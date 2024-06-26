@@ -315,7 +315,7 @@ public abstract class AbstractRatMojo extends AbstractMojo {
     
     private org.apache.rat.utils.Log makeLog() {
         return new org.apache.rat.utils.Log() {
-            Log log = getLog();
+            final Log log = getLog();
             @Override
             public void log(Level level, String msg) {
                 switch (level)
@@ -346,8 +346,6 @@ public abstract class AbstractRatMojo extends AbstractMojo {
             config.setFrom(defaults);
         } else {
             config.setStyleSheet(Defaults.getPlainStyleSheet());
-            config.setDirectoriesToIgnore(Defaults.getDirectoriesToIgnore());
-            config.setFilesToIgnore(Defaults.getFilesToIgnore());
         }
 
         if (additionalLicenseFiles != null) {

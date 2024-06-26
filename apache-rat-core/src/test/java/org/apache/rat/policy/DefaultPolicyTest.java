@@ -30,7 +30,8 @@ import org.apache.rat.license.ILicenseFamily;
 import org.apache.rat.license.LicenseFamilySetFactory;
 import org.apache.rat.license.LicenseSetFactory.LicenseFilter;
 import org.apache.rat.testhelpers.TestingLicense;
-import org.apache.rat.testhelpers.TestingLocation;
+import org.apache.rat.testhelpers.TestingDocument;
+import org.apache.rat.testhelpers.TestingMatcher;
 import org.apache.rat.utils.DefaultLog;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -60,9 +61,9 @@ public class DefaultPolicyTest {
 
     @BeforeEach
     public void setUp() throws Exception {
-        defaults = Defaults.builder().build(DefaultLog.INSTANCE);
+        defaults = Defaults.builder().build(DefaultLog.getInstance());
         policy = new DefaultPolicy(defaults.getLicenseFamilies(LicenseFilter.APPROVED));
-        document = new TestingLocation("subject");
+        document = new TestingDocument("subject");
     }
 
     private void assertApproval(boolean pApproved) {
@@ -71,7 +72,7 @@ public class DefaultPolicyTest {
     }
 
     private void setMetadata(ILicenseFamily family) {
-        document.getMetaData().reportOnLicense(new TestingLicense(family));
+        document.getMetaData().reportOnLicense(new TestingLicense(family.getFamilyCategory().trim(), new TestingMatcher(), family));
     }
 
     private static ILicenseFamily makeFamily(String category, String name) {
@@ -153,7 +154,7 @@ public class DefaultPolicyTest {
         Document.Type[] nonStandardDocuments = { Document.Type.NOTICE, Document.Type.ARCHIVE, Document.Type.BINARY };
 
         for (Document.Type d : nonStandardDocuments) {
-            document = new TestingLocation("subject");
+            document = new TestingDocument("subject");
             document.getMetaData().setDocumentType(d);
             policy.analyse(document);
             assertEquals(0, document.getMetaData().licenses().count(), "failed on " + d);

@@ -86,6 +86,7 @@
           <configuration>
             <excludes>
               <!-- These files do not have license headers because they are used to test license headers -->
+              <exclude>src/it/**</exclude>
               <exclude>src/it/**/src.apt</exclude>
               <exclude>src/test/resources/unit/**</exclude>
               <exclude>**/*.iml</exclude>
@@ -156,7 +157,6 @@
     <dependency>
       <groupId>org.apache.rat</groupId>
       <artifactId>apache-rat-core</artifactId>
-      <version>${project.parent.version}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.rat</groupId>
@@ -184,7 +184,6 @@
     <dependency>
       <groupId>org.apache.maven.plugin-tools</groupId>
       <artifactId>maven-plugin-annotations</artifactId>
-      <version>${mavenPluginPluginVersion}</version>
       <scope>provided</scope>
     </dependency>
     <dependency>

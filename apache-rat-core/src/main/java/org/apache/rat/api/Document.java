@@ -21,17 +21,19 @@ package org.apache.rat.api;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
-
-import org.apache.rat.document.CompositeDocumentException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.SortedSet;
 
 /**
  * The representation of a document being scanned.
  */
-public interface Document {
+public abstract class Document implements Comparable<Document> {
+
     /**
      * An enumeraton of document types.
      */
-    enum Type {
+    public enum Type {
         /** A generated document. */
         GENERATED,
         /** An unknown document type. */
@@ -46,20 +48,59 @@ public interface Document {
         STANDARD;;
     }
 
+    private final MetaData metaData;
+    private final String name;
+
+    /**
+     * Creates an instance.
+     * @param name the name of the resource.
+     */
+    protected Document(String name) {
+        this.name = name;
+        this.metaData = new MetaData();
+    }
+
     /**
      * @return the name of the current document.
      */
-    String getName();
+    public final String getName() {
+        return name;
+    }
+
+    @Override
+    public int compareTo(Document doc) {
+        return getPath().compareTo(doc.getPath());
+    }
+
+    @Override
+    public int hashCode() {
+        return getPath().hashCode();
+    }
+
+    @Override
+    public boolean equals(final Object obj) {
+        if (!(obj instanceof Document)) {
+            return false;
+        }
+        return getPath().equals(((Document) obj).getPath());
+    }
+
+    /**
+     * Get the path that identifies the document.
+     * @return the path for the document.
+     */
+    public Path getPath() {
+        return Paths.get(getName());
+    }
 
     /**
      * Reads the contents of this document.
      * 
      * @return <code>Reader</code> not null
      * @throws IOException if this document cannot be read
-     * @throws CompositeDocumentException if this document can only be read as a
      * composite archive
      */
-    Reader reader() throws IOException;
+    public abstract Reader reader() throws IOException;
 
     /**
      * Streams the document's contents.
@@ -67,19 +108,37 @@ public interface Document {
      * @return a non null input stream of the document.
      * @throws IOException when stream could not be opened
      */
-    InputStream inputStream() throws IOException;
+    public abstract InputStream inputStream() throws IOException;
 
     /**
      * Gets data describing this resource.
      * 
      * @return a non null MetaData object.
      */
-    MetaData getMetaData();
+    public final MetaData getMetaData() {
+        return metaData;
+    }
 
     /**
-     * Tests if this a composite document.
-     * 
-     * @return true if composite, false otherwise
+     * Representations suitable for logging.
+     * @return a <code>String</code> representation
+     * of this object.
      */
-    boolean isComposite();
+    @Override
+    public String toString() {
+        return String.format("%s( name = %s metaData = %s )", this.getClass().getSimpleName(), getName(), getMetaData());
+    }
+
+    /**
+     * Determines if this Document is a directory type.
+     * @return {@code true} if this is a directory.
+     */
+    public abstract boolean isDirectory();
+
+    /**
+     * Gets a sorted set of Documents that are children of this document.
+     * @return A sorted set of child Documents.  May  be empty
+     */
+    public abstract SortedSet<Document> listChildren();
+
 }

@@ -4,6 +4,8 @@ ASF Jenkins: [![ASF Jenkins Build Status](https://ci-builds.apache.org/buildStat
 
 GA: [![Github Action master branch status](https://github.com/apache/creadur-rat/actions/workflows/maven.yml/badge.svg?branch=master)](https://github.com/apache/creadur-rat/actions)
 
+[![Revved up by Develocity](https://img.shields.io/badge/Revved%20up%20by-Develocity-06A0CE?logo=Gradle&labelColor=02303A)](https://ge.apache.org/scans?list.sortColumn=buildDuration&list.sortOrder=asc&search.buildToolType=maven&search.names=not:CI%20stage&search.rootProjectNames=Apache%20Creadur%20Rat&search.tasks=install&search.timeZoneId=Europe%2FBerlin&search.values=Build%20Parent-pom)
+
 ## What is RAT?
 
 Apache Rat is developed by the Apache Creadur project of the Apache Software
@@ -13,7 +15,7 @@ at https://creadur.apache.org/rat.
 *Release Audit Tool (Rat)* is a tool to improve accuracy and efficiency when checking
 releases. It is heuristic in nature: making guesses about possible problems. It
 will produce false positives and cannot find every possible issue with a release.
-It's reports require interpretation.
+Its reports require interpretation.
 
 Rat was developed in response to a need felt in the Apache Incubator to be able to
 review releases for the most common faults less labour intensively. It is therefore
@@ -36,7 +38,7 @@ For Maven builds, the plugin is recommended.
 
 In response to demands from project quality tool developers, Rat is available as a
 library (rat-lib jar) suitable for inclusion in tools. Note that binary compatibility
-is not guaranteed between 0.x releases. The XML output format is not yet in it's
+is not guaranteed between 0.x releases. The XML output format is not yet in its
 final form and so library users are recommended to either use the supplied
 stylesheets or keep in close touch with the code.
 

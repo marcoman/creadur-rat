@@ -27,13 +27,13 @@ import static org.mockito.Mockito.when;
 
 import java.io.File;
 import java.io.StringWriter;
-import java.util.regex.Pattern;
 
 import org.apache.commons.io.filefilter.HiddenFileFilter;
 import org.apache.rat.ConfigurationException;
 import org.apache.rat.Defaults;
 import org.apache.rat.ReportConfiguration;
 import org.apache.rat.api.Document;
+import org.apache.rat.document.impl.FileDocument;
 import org.apache.rat.license.ILicense;
 import org.apache.rat.license.ILicenseFamily;
 import org.apache.rat.report.RatReport;
@@ -71,11 +71,11 @@ public class XmlReportFactoryTest {
     @Test
     public void standardReport() throws Exception {
         final String elementsPath = Resources.getResourceDirectory("elements/Source.java");
-        final ReportConfiguration configuration = new ReportConfiguration(DefaultLog.INSTANCE);
-        final TestingLicense testingLicense = new TestingLicense(new TestingMatcher(true), family);
-        configuration.setFrom(Defaults.builder().build(DefaultLog.INSTANCE));
-
-        DirectoryWalker directory = new DirectoryWalker(new File(elementsPath), configuration.getFilesToIgnore(), HiddenFileFilter.HIDDEN);
+        final ReportConfiguration configuration = new ReportConfiguration(DefaultLog.getInstance());
+        final TestingLicense testingLicense = new TestingLicense("TEST", new TestingMatcher(true), family);
+        configuration.setFrom(Defaults.builder().build(DefaultLog.getInstance()));
+        configuration.setDirectoriesToIgnore(HiddenFileFilter.HIDDEN);
+        DirectoryWalker directory = new DirectoryWalker(configuration, new FileDocument(new File(elementsPath)));
         final ClaimStatistic statistic = new ClaimStatistic();
 
         configuration.addLicense(testingLicense);
@@ -96,14 +96,14 @@ public class XmlReportFactoryTest {
     }
 
     @Test
-    public void testNoLicense() throws Exception {
+    public void testNoLicense()  {
 
         final ILicense mockLicense = mock(ILicense.class);
         when(mockLicense.matches(any())).thenReturn(true);
         when(mockLicense.getLicenseFamily()).thenReturn(family);
 
         final ClaimStatistic statistic = new ClaimStatistic();
-        final ReportConfiguration configuration = new ReportConfiguration(DefaultLog.INSTANCE);
+        final ReportConfiguration configuration = new ReportConfiguration(DefaultLog.getInstance());
         // configuration.addLicense(mockLicense);
         try {
             XmlReportFactory.createStandardReport(writer, statistic, configuration);
@@ -111,6 +111,5 @@ public class XmlReportFactoryTest {
         } catch (ConfigurationException e) {
             // expected;
         }
-
     }
 }
