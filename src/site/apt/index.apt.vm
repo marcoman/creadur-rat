@@ -19,7 +19,7 @@
                    A Release Audit Tool
                    --------------------------
 
-Apache Rat
+Apache Rat&#8482;
 
  In a hurry? Jump to {{{Quick_Start:_Running_Rat}quick start}}
 
@@ -75,6 +75,8 @@ Apache Rat
    * Add a new definition format.  Requires Java expertise as well as expertise with the format.
 
    * Write a new {{{./xslt_def.html}output report}}.  Requires XSLT knowledge.
+
+   * Write a new {{{./ui_def.html}user interface}}.  Requires Java expertise, but there are tools to help.
 
 ** Who Develops Rat?
 

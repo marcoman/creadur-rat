@@ -18,9 +18,7 @@
  */
 package org.apache.rat;
 
-import org.apache.commons.cli.Option;
-import org.apache.rat.utils.DefaultLog;
-import org.apache.rat.utils.Log;
+import static java.lang.String.format;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -28,7 +26,9 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.util.function.Consumer;
 
-import static java.lang.String.format;
+import org.apache.commons.cli.Option;
+import org.apache.rat.utils.DefaultLog;
+import org.apache.rat.utils.Log;
 
 /**
  * Reporting methods for deprecated objects.
@@ -80,18 +80,6 @@ public final class DeprecationReporter {
                 }
             }
             DefaultLog.getInstance().warn(sb.toString());
-        }
-    }
-
-    /**
-     * Log deprecated options
-     * @param log The log to write to.
-     * @param option potentially deprecated option to log.
-     */
-    // TODO remove this when commons-cli 1.7.1 or higher is available
-    public static void logDeprecated(final Log log, final Option option) {
-        if (option.isDeprecated()) {
-            getLogReporter(log).accept(option);
         }
     }
 
